@@ -1,0 +1,108 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+
+export default function SignupPage() {
+    const router = useRouter();
+    const [name, setName] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoading(true);
+        setError("");
+
+        try {
+            const res = await fetch("http://localhost:4000/api/auth/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, email, password }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || "Failed to register");
+            }
+
+            // Automatically log them in or redirect to login
+            router.push("/login");
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="flex-1 flex items-center justify-center p-6 bg-muted/10">
+            <div className="w-full max-w-md bg-background border border-muted rounded-2xl p-8 shadow-sm slide-up">
+                <div className="text-center mb-8">
+                    <h1 className="text-3xl font-bold mb-2">Create Account</h1>
+                    <p className="text-muted-foreground">Start growing your photography business.</p>
+                </div>
+
+                {error && (
+                    <div className="bg-rose-500/10 text-rose-500 p-3 rounded-lg text-sm mb-6 border border-rose-500/20 text-center">
+                        {error}
+                    </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-1" htmlFor="name">Full Name</label>
+                        <input
+                            id="name"
+                            type="text"
+                            required
+                            className="w-full px-4 py-3 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground transition-all"
+                            placeholder="Jane Doe"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1" htmlFor="email">Email</label>
+                        <input
+                            id="email"
+                            type="email"
+                            required
+                            className="w-full px-4 py-3 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground transition-all"
+                            placeholder="you@example.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium mb-1" htmlFor="password">Password</label>
+                        <input
+                            id="password"
+                            type="password"
+                            required
+                            className="w-full px-4 py-3 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground transition-all"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                        />
+                    </div>
+                    <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3 rounded-xl bg-foreground text-background font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity mt-4"
+                    >
+                        {isLoading ? "Creating..." : "Sign Up"}
+                    </button>
+                </form>
+
+                <div className="mt-6 text-center text-sm text-muted-foreground">
+                    Already have an account? <Link href="/login" className="text-foreground font-medium underline">Log in</Link>
+                </div>
+            </div>
+        </div>
+    );
+}
