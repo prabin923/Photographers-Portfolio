@@ -16,12 +16,33 @@ interface GallerySettings {
     allowDownloads: boolean;
     addWatermark: boolean;
     language: string;
+    // Favorites
+    allowSelection: boolean;
+    favoritesName: string;
+    limitSelected: boolean;
+    allowComments: boolean;
+    // Privacy & Requirements
+    requireEmail: boolean;
+    requirePhone: boolean;
+    requireInfo: boolean;
+    // Reviews
+    allowReviews: boolean;
+    reviewMessage: string;
+    askReviewAfterDownload: boolean;
+    // Contacts
+    showShareButton: boolean;
+    showBusinessCard: boolean;
+    showNameOnCover: boolean;
+    // Privacy
+    protectWithPassword: boolean;
+    password: string;
+    allowGuestAccess: boolean;
 }
 
-const Toggle = ({ defaultChecked = false, disabled = false, onChange }: { defaultChecked?: boolean; disabled?: boolean; onChange?: (v: boolean) => void }) => (
+const Toggle = ({ checked = false, disabled = false, onChange, id }: { checked?: boolean; disabled?: boolean; onChange?: (v: boolean) => void; id?: string }) => (
     <label className="relative inline-flex items-center cursor-pointer ml-4 shrink-0">
-        <input type="checkbox" defaultChecked={defaultChecked} disabled={disabled} onChange={e => onChange?.(e.target.checked)} className="sr-only peer" />
-        <div className={`w-10 h-6 bg-muted rounded-full peer peer-checked:bg-foreground transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-4 ${disabled ? "opacity-40" : ""}`} />
+        <input type="checkbox" checked={checked} disabled={disabled} onChange={e => onChange?.(e.target.checked)} className="sr-only peer" id={id} />
+        <div className={`w-11 h-6 bg-white/5 rounded-full peer peer-checked:bg-blue-600 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5 border border-white/5 ${disabled ? "opacity-20" : ""}`} />
     </label>
 );
 
@@ -51,6 +72,22 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
         allowDownloads: true,
         addWatermark: false,
         language: "English (default)",
+        allowSelection: true,
+        favoritesName: "Selecting photos",
+        limitSelected: false,
+        allowComments: false,
+        requireEmail: true,
+        requirePhone: false,
+        requireInfo: false,
+        allowReviews: true,
+        reviewMessage: "Please write your review",
+        askReviewAfterDownload: true,
+        showShareButton: true,
+        showBusinessCard: true,
+        showNameOnCover: true,
+        protectWithPassword: false,
+        password: "",
+        allowGuestAccess: false,
     });
     const [settingsSaved, setSettingsSaved] = useState(false);
 
@@ -70,7 +107,34 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
                 setClientName(name);
                 setImages(data.images || []);
                 setVideos(data.videos || []);
-                setSettings(prev => ({ ...prev, galleryName: name }));
+                setLikedPhotos(new Set(data.favorites || []));
+                setCoverColor(data.coverColor || "#0f0f0f");
+                setCoverAccent(data.coverAccent || "#e11d48");
+                setSettings({
+                    galleryName: name,
+                    shootDate: data.shootDate || "",
+                    storeUntil: data.storeUntil || "2026-03-31",
+                    galleryType: data.galleryType || "client",
+                    allowDownloads: data.allowDownloads !== undefined ? data.allowDownloads : true,
+                    addWatermark: data.addWatermark || false,
+                    language: data.language || "English (default)",
+                    allowSelection: data.allowSelection !== undefined ? data.allowSelection : true,
+                    favoritesName: data.favoritesName || "Selecting photos",
+                    limitSelected: data.limitSelected || false,
+                    allowComments: data.allowComments || false,
+                    requireEmail: data.requireEmail !== undefined ? data.requireEmail : true,
+                    requirePhone: data.requirePhone || false,
+                    requireInfo: data.requireInfo || false,
+                    allowReviews: data.allowReviews !== undefined ? data.allowReviews : true,
+                    reviewMessage: data.reviewMessage || "Please write your review",
+                    askReviewAfterDownload: data.askReviewAfterDownload !== undefined ? data.askReviewAfterDownload : true,
+                    showShareButton: data.showShareButton !== undefined ? data.showShareButton : true,
+                    showBusinessCard: data.showBusinessCard !== undefined ? data.showBusinessCard : true,
+                    showNameOnCover: data.showNameOnCover !== undefined ? data.showNameOnCover : true,
+                    protectWithPassword: data.protectWithPassword || false,
+                    password: data.password || "",
+                    allowGuestAccess: data.allowGuestAccess || false,
+                });
                 setIsLoading(false);
             })
             .catch(() => { setError("Failed to load gallery."); setIsLoading(false); });
@@ -78,9 +142,24 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
 
     useEffect(() => { fetchDrive(); }, [fetchDrive]);
 
-    const handleLike = (id: string) => setLikedPhotos(prev => {
-        const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next;
-    });
+    const handleLike = async (id: string) => {
+        const nextLiked = new Set(likedPhotos);
+        nextLiked.has(id) ? nextLiked.delete(id) : nextLiked.add(id);
+
+        // Optimistic UI update
+        setLikedPhotos(nextLiked);
+
+        // Sync with backend
+        try {
+            await fetch(`http://localhost:4000/api/drives/${folderId}/settings`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ favorites: Array.from(nextLiked) })
+            });
+        } catch (e) {
+            console.error("Failed to sync favorites:", e);
+        }
+    };
 
     const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
     const onDragLeave = () => setIsDragging(false);
@@ -104,9 +183,25 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
         finally { setIsUploading(false); }
     };
 
-    const handleSaveSettings = () => {
-        setClientName(settings.galleryName || clientName);
-        setSettingsSaved(true); setTimeout(() => setSettingsSaved(false), 2500);
+    const handleSaveSettings = async () => {
+        try {
+            const res = await fetch(`http://localhost:4000/api/drives/${folderId}/settings`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    clientName: settings.galleryName,
+                    ...settings,
+                    coverColor,
+                    coverAccent
+                })
+            });
+            if (!res.ok) throw new Error();
+            setClientName(settings.galleryName || clientName);
+            setSettingsSaved(true);
+            setTimeout(() => setSettingsSaved(false), 2500);
+        } catch (e) {
+            alert("Failed to save settings.");
+        }
     };
 
     const handleDeleteGallery = async () => {
@@ -162,22 +257,41 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
     const settingsTabList: SettingsTab[] = ["Main", "Favorites", "Products", "Reviews", "Contacts", "Privacy"];
 
     return (
-        <div className="flex-1 flex flex-col">
+        <div className="min-h-screen bg-premium-gradient text-white font-sans overflow-y-auto custom-scrollbar flex flex-col">
             {/* Sticky Header */}
-            <div className="border-b border-muted/40 bg-background/95 backdrop-blur-sm sticky top-[80px] z-40">
-                <div className="container mx-auto px-6 pt-5 pb-0">
-                    <Link href="/client" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-2 w-fit">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                        All galleries
+            <div className="border-b border-white/5 bg-black/40 backdrop-blur-2xl sticky top-0 z-40 transition-all duration-500">
+                <div className="container mx-auto px-10 pt-8">
+                    <Link href="/admin" className="inline-flex items-center gap-2 text-[10px] font-black text-white/30 hover:text-white transition-all mb-4 group tracking-widest uppercase">
+                        <div className="p-1 rounded-lg bg-white/5 group-hover:bg-white/10 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                        </div>
+                        Back to Dashboard
                     </Link>
-                    <h1 className="text-2xl font-bold mb-4">{clientName}</h1>
-                    <nav className="flex gap-0 overflow-x-auto scrollbar-none">
+                    <div className="flex items-center justify-between mb-8">
+                        <div>
+                            <h1 className="text-4xl font-black tracking-tighter text-gradient">{clientName}</h1>
+                            <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.3em] mt-1.5 flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                Secure Client Sanctuary · {images.length + videos.length} Media Assets
+                            </p>
+                        </div>
+                        <div className="flex gap-4">
+                            <button onClick={() => window.open(galleryLink, '_blank')} className="px-6 py-3 rounded-2xl bg-white/5 border border-white/5 text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-2 group">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 01-2 2h14a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                                LIVE PREVIEW
+                            </button>
+                            <button onClick={handleSaveSettings} className="px-6 py-3 rounded-2xl bg-blue-600 text-white text-xs font-black hover:bg-blue-500 transition-all accent-glow active:scale-95">
+                                {settingsSaved ? "CHANGES SAVED" : "SAVE CONFIGURATION"}
+                            </button>
+                        </div>
+                    </div>
+                    <nav className="flex gap-4 overflow-x-auto scrollbar-none border-t border-white/5">
                         {navTabs.map(tab => (
                             <button key={tab.id} onClick={() => setSection(tab.id)}
-                                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${section === tab.id ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"} ${tab.id === "favorites" && likedPhotos.size > 0 ? "!text-rose-500" : ""}`}>
-                                <span className={tab.id === "favorites" && likedPhotos.size > 0 ? "text-rose-500" : ""}>{tab.icon}</span>
+                                className={`flex items-center gap-2.5 px-6 py-5 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${section === tab.id ? "border-blue-500 text-white" : "border-transparent text-white/20 hover:text-white/40"}`}>
+                                {tab.icon}
                                 {tab.label}
-                                {tab.badge !== undefined && <span className="ml-0.5 bg-rose-500 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{tab.badge}</span>}
+                                {tab.badge !== undefined && <span className="ml-1 bg-white/10 text-white text-[10px] rounded-lg px-2 py-0.5 leading-none">{tab.badge}</span>}
                             </button>
                         ))}
                     </nav>
@@ -189,20 +303,23 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
 
                 {/* ── GALLERY ── */}
                 {section === "gallery" && (
-                    <div>
-                        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-                            <div className="inline-flex bg-muted/50 p-1 rounded-full border border-muted">
-                                <button onClick={() => setMediaTab("images")} className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${mediaTab === "images" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Photos ({images.length})</button>
-                                <button onClick={() => setMediaTab("videos")} className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${mediaTab === "videos" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}>Videos ({videos.length})</button>
+                    <div className="slide-up">
+                        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+                            <div className="inline-flex glass-dark p-1.5 rounded-2xl border border-white/5">
+                                <button onClick={() => setMediaTab("images")} className={`px-8 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${mediaTab === "images" ? "bg-white text-black shadow-xl" : "text-white/30 hover:text-white"}`}>Photos · {images.length}</button>
+                                <button onClick={() => setMediaTab("videos")} className={`px-8 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${mediaTab === "videos" ? "bg-white text-black shadow-xl" : "text-white/30 hover:text-white"}`}>Videos · {videos.length}</button>
                             </div>
-                            <p className="text-xs text-muted-foreground hidden sm:block">Click any photo to view full screen · Heart to add to favorites</p>
+                            <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] hidden sm:block">Click assets for immersive view · Heart to curate favorites</p>
                         </div>
 
                         {/* Drop Zone */}
                         <div onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} onClick={() => fileInputRef.current?.click()}
-                            className={`mb-6 flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${isDragging ? "border-foreground bg-foreground/5 scale-[1.01]" : "border-muted bg-muted/10 hover:bg-muted/20 hover:border-foreground/40"}`}>
-                            <svg xmlns="http://www.w3.org/2000/svg" className={`w-6 h-6 mb-1.5 transition-colors ${isDragging ? "text-foreground" : "text-muted-foreground"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
-                            <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">Drag & drop</span> photos/videos here or <span className="underline">browse</span></p>
+                            className={`mb-10 flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-[2.5rem] cursor-pointer transition-all duration-500 relative group/drop overflow-hidden ${isDragging ? "border-blue-500 bg-blue-500/5 scale-[1.005]" : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/20"}`}>
+                            <div className="absolute inset-0 bg-blue-500/0 group-hover/drop:bg-blue-500/[0.02] transition-colors" />
+                            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mb-3 group-hover/drop:scale-110 group-hover/drop:bg-blue-500/10 transition-all duration-500 relative z-10">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white/20 group-hover/drop:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                            </div>
+                            <p className="text-sm font-bold text-white/40 relative z-10">Select files or <span className="text-white">drag & drop</span></p>
                             <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" className="hidden" onChange={e => { if (e.target.files) setUploadFiles(prev => [...prev, ...Array.from(e.target.files!)]); }} />
                         </div>
 
@@ -249,28 +366,42 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
 
                 {/* ── FAVORITES ── */}
                 {section === "favorites" && (
-                    <div>
-                        <div className="flex items-center justify-between mb-8">
-                            <div><h2 className="text-xl font-bold">Favorites</h2><p className="text-sm text-muted-foreground mt-1">{likedPhotos.size} item{likedPhotos.size !== 1 ? "s" : ""} selected</p></div>
-                            {likedPhotos.size > 0 && <button onClick={() => alert(`Downloading ${likedPhotos.size} favorites...`)} className="px-5 py-2.5 rounded-full bg-foreground text-background text-sm font-semibold hover:opacity-90 flex items-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>Download All</button>}
+                    <div className="slide-up">
+                        <div className="flex items-center justify-between mb-10">
+                            <div>
+                                <h2 className="text-2xl font-black tracking-tight">Curated Favorites</h2>
+                                <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mt-1">{likedPhotos.size} items have been chosen</p>
+                            </div>
+                            {likedPhotos.size > 0 && (
+                                <button onClick={() => alert(`Downloading ${likedPhotos.size} favorites...`)} className="px-6 py-3 rounded-2xl bg-white text-black text-xs font-black hover:bg-white/90 transition-all flex items-center gap-2 shadow-xl active:scale-95">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                                    DOWNLOAD ALL
+                                </button>
+                            )}
                         </div>
                         {likedPhotos.size === 0 ? (
-                            <div className="text-center py-24"><p className="text-5xl mb-4">🤍</p><h3 className="text-lg font-semibold mb-2">No favorites yet</h3><p className="text-muted-foreground text-sm mb-6">Heart photos in Gallery to add them here.</p><button onClick={() => setSection("gallery")} className="underline text-sm">Go to Gallery →</button></div>
+                            <div className="glass-dark border border-white/5 rounded-[3rem] py-32 text-center">
+                                <div className="w-20 h-20 bg-white/5 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+                                    <p className="text-4xl text-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.3)]">🤍</p>
+                                </div>
+                                <h3 className="text-lg font-bold mb-2">No favorites captured yet</h3>
+                                <p className="text-white/30 text-xs font-medium mb-8">Heart photos in the main gallery to curate your collection.</p>
+                                <button onClick={() => setSection("gallery")} className="text-xs font-black text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest">Explore Gallery →</button>
+                            </div>
                         ) : <PhotoGrid photos={favoritePhotos} enableLikes onLike={handleLike} likedPhotos={likedPhotos} />}
                     </div>
                 )}
 
                 {/* ── SETTINGS ── */}
                 {section === "settings" && (
-                    <div className="max-w-2xl">
-                        <p className="text-sm text-muted-foreground mb-6">Manage gallery name, favorites, storage periods, and other important settings.</p>
+                    <div className="max-w-3xl slide-up">
+                        <p className="text-[11px] font-bold text-white/30 uppercase tracking-[0.2em] mb-10">Advanced Gallery Orchestration</p>
 
                         {/* Settings sub-tabs */}
-                        <div className="flex gap-0 border-b border-muted mb-8 overflow-x-auto scrollbar-none">
+                        <div className="flex gap-2 border-b border-white/5 mb-10 overflow-x-auto scrollbar-none">
                             {settingsTabList.map(tab => (
                                 <button key={tab} onClick={() => setSettingsTab(tab)}
-                                    className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${settingsTab === tab ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+                                    className={`px-6 py-4 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${settingsTab === tab ? "border-blue-500 text-white" : "border-transparent text-white/20 hover:text-white"}`}>
                                     {tab}
                                 </button>
                             ))}
@@ -278,62 +409,69 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
 
                         {/* Main */}
                         {settingsTab === "Main" && (
-                            <div className="space-y-6">
+                            <div className="space-y-10 animate-fade-in">
                                 <div>
-                                    <label className="block text-sm font-medium mb-1.5">Gallery name</label>
-                                    <input type="text" value={settings.galleryName} onChange={e => setSettings(s => ({ ...s, galleryName: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground transition-all text-sm" placeholder="e.g. Emma & James Wedding" />
+                                    <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-4 ml-1">Gallery Identity</label>
+                                    <input type="text" value={settings.galleryName} onChange={e => setSettings(s => ({ ...s, galleryName: e.target.value }))} className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-6 py-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-white/20 transition-all placeholder:text-white/10" placeholder="e.g. Masterpiece Wedding 2024" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium mb-1.5">Gallery link</label>
-                                    <div className="flex items-center border border-muted rounded-xl overflow-hidden bg-muted/20">
-                                        <span className="text-xs text-muted-foreground px-3 py-2.5 border-r border-muted shrink-0">localhost:3000/client/</span>
-                                        <span className="text-sm font-mono flex-1 px-3 truncate">{folderId}</span>
-                                        <button onClick={() => navigator.clipboard.writeText(galleryLink)} className="shrink-0 px-3 py-2.5 text-xs text-muted-foreground hover:text-foreground border-l border-muted">Copy</button>
+                                    <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-4 ml-1">Access Channel</label>
+                                    <div className="flex items-center border border-white/5 rounded-2xl overflow-hidden bg-white/[0.02] group">
+                                        <span className="text-[10px] font-black text-white/20 px-6 py-4 border-r border-white/5 shrink-0 bg-white/[0.01]">LENSDRIVE.COM/CL/</span>
+                                        <span className="text-sm font-mono flex-1 px-6 truncate font-bold">{folderId}</span>
+                                        <button onClick={() => navigator.clipboard.writeText(galleryLink)} className="shrink-0 px-6 py-4 text-[10px] font-black text-blue-400 hover:text-white hover:bg-blue-600 transition-all border-l border-white/5 uppercase tracking-widest">Copy Link</button>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div>
-                                        <label className="block text-sm font-medium mb-1.5">Shoot date</label>
-                                        <input type="date" value={settings.shootDate} onChange={e => setSettings(s => ({ ...s, shootDate: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground text-sm" />
+                                        <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-4 ml-1">Production Date</label>
+                                        <input type="date" value={settings.shootDate} onChange={e => setSettings(s => ({ ...s, shootDate: e.target.value }))} className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-6 py-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-white/20 transition-all text-white inverted-scheme" />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium mb-1.5">Store until</label>
-                                        <div className="flex items-center gap-2">
-                                            <input type="date" value={settings.storeUntil} onChange={e => setSettings(s => ({ ...s, storeUntil: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground text-sm" />
-                                            {settings.storeUntil && <button onClick={() => setSettings(s => ({ ...s, storeUntil: "" }))} className="text-muted-foreground hover:text-foreground text-xs shrink-0">✕</button>}
+                                        <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-4 ml-1">Persistence Until</label>
+                                        <div className="relative">
+                                            <input type="date" value={settings.storeUntil} onChange={e => setSettings(s => ({ ...s, storeUntil: e.target.value }))} className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-6 py-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-white/20 transition-all text-white inverted-scheme" />
+                                            {settings.storeUntil && <button onClick={() => setSettings(s => ({ ...s, storeUntil: "" }))} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white text-xs shrink-0">✕</button>}
                                         </div>
-                                        <p className="text-xs text-muted-foreground mt-1">Remove the date for open-ended storage.</p>
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium mb-3">Gallery type</label>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button onClick={() => setSettings(s => ({ ...s, galleryType: "client" }))} className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${settings.galleryType === "client" ? "border-foreground bg-foreground/5" : "border-muted hover:border-foreground/30"}`}>
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="18" height="18" rx="2" /><path strokeLinecap="round" strokeLinejoin="round" d="M3 9h18" /></svg>Client gallery
+                                    <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-4 ml-1">Environment Classification</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <button onClick={() => setSettings(s => ({ ...s, galleryType: "client" }))} className={`flex items-center gap-4 px-6 py-4 rounded-2xl border transition-all ${settings.galleryType === "client" ? "border-blue-500 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.1)]" : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04]"}`}>
+                                            <div className={`p-2 rounded-lg ${settings.galleryType === "client" ? "bg-blue-500 text-white" : "bg-white/5 text-white/30"}`}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><rect x="3" y="3" width="18" height="18" rx="2" /><path strokeLinecap="round" strokeLinejoin="round" d="M3 9h18" /></svg>
+                                            </div>
+                                            <div className="text-left">
+                                                <p className="text-xs font-black">Private Sanctuary</p>
+                                                <p className="text-[10px] text-white/20 font-bold uppercase tracking-tighter">Client delivery focused</p>
+                                            </div>
                                         </button>
-                                        <button onClick={() => setSettings(s => ({ ...s, galleryType: "sales" }))} className={`flex items-center gap-2 px-4 py-3 rounded-xl border-2 text-sm font-medium transition-all ${settings.galleryType === "sales" ? "border-foreground bg-foreground/5" : "border-muted hover:border-foreground/30"}`}>
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-1.5 6M17 13l1.5 6M9 19h6" /></svg>Photo sales
+                                        <button onClick={() => setSettings(s => ({ ...s, galleryType: "sales" }))} className={`flex items-center gap-4 px-6 py-4 rounded-2xl border transition-all ${settings.galleryType === "sales" ? "border-purple-500 bg-purple-500/10 shadow-[0_0_20px_rgba(168,85,247,0.1)]" : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04]"}`}>
+                                            <div className={`p-2 rounded-lg ${settings.galleryType === "sales" ? "bg-purple-500 text-white" : "bg-white/5 text-white/30"}`}>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-1.5 6M17 13l1.5 6M9 19h6" /></svg>
+                                            </div>
+                                            <div className="text-left">
+                                                <p className="text-xs font-black">Commercial Suite</p>
+                                                <p className="text-[10px] text-white/20 font-bold uppercase tracking-tighter">Sales and licenses enabled</p>
+                                            </div>
                                         </button>
                                     </div>
                                 </div>
-                                <div className="rounded-xl border border-muted overflow-hidden divide-y divide-muted/50">
-                                    <div className="flex items-center justify-between px-4 py-4">
-                                        <p className="text-sm font-medium">Allow original file downloads</p>
-                                        <Toggle defaultChecked={settings.allowDownloads} onChange={v => setSettings(s => ({ ...s, allowDownloads: v, addWatermark: v ? false : s.addWatermark }))} />
-                                    </div>
-                                    <div className={`flex items-center justify-between px-4 py-4 ${settings.allowDownloads ? "opacity-40 pointer-events-none" : ""}`}>
-                                        <div><p className="text-sm font-medium">Add watermark</p><p className="text-xs text-muted-foreground mt-0.5">Applied to photos. Available only when downloads are disabled.</p></div>
-                                        <Toggle defaultChecked={settings.addWatermark} disabled={settings.allowDownloads} onChange={v => setSettings(s => ({ ...s, addWatermark: v }))} />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium mb-1.5">Gallery language</label>
-                                    <div className="flex items-center justify-between p-4 rounded-xl border border-muted bg-muted/10">
-                                        <div className="flex items-center gap-2">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064" /></svg>
-                                            <span className="text-sm">{settings.language}</span>
+                                <div className="glass-dark border border-white/5 rounded-3xl divide-y divide-white/5 overflow-hidden">
+                                    <div className="flex items-center justify-between px-8 py-6">
+                                        <div>
+                                            <p className="text-xs font-black">Unrestricted Asset Extraction</p>
+                                            <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest mt-0.5">Allow original high-res downloads</p>
                                         </div>
-                                        <button className="text-xs text-muted-foreground hover:text-foreground underline">Change</button>
+                                        <Toggle checked={settings.allowDownloads} onChange={v => setSettings(s => ({ ...s, allowDownloads: v, addWatermark: v ? false : s.addWatermark }))} />
+                                    </div>
+                                    <div className={`flex items-center justify-between px-8 py-6 transition-opacity duration-500 ${settings.allowDownloads ? "opacity-20 pointer-events-none" : ""}`}>
+                                        <div>
+                                            <p className="text-xs font-black">Visual Metadata (Watermark)</p>
+                                            <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest mt-0.5">Protect assets during preview phases</p>
+                                        </div>
+                                        <Toggle checked={settings.addWatermark} disabled={settings.allowDownloads} onChange={v => setSettings(s => ({ ...s, addWatermark: v }))} aria-hidden={settings.allowDownloads} />
                                     </div>
                                 </div>
                             </div>
@@ -344,17 +482,17 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
                             <div className="space-y-4">
                                 <div className="rounded-xl border border-muted p-4 flex items-center justify-between">
                                     <p className="text-sm font-medium">Allow photo selection</p>
-                                    <Toggle defaultChecked />
+                                    <Toggle checked={settings.allowSelection} onChange={v => setSettings(s => ({ ...s, allowSelection: v }))} />
                                 </div>
                                 <p className="text-xs text-muted-foreground px-1">Clients can add files to Favorites to select photos for retouching, printing, and more.</p>
                                 <div className="rounded-xl border border-muted divide-y divide-muted/50 overflow-hidden">
                                     <div className="p-4">
                                         <p className="text-sm font-semibold mb-3">Favorites name</p>
-                                        <input type="text" defaultValue="Selecting photos" className="w-full px-4 py-2.5 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground text-sm" />
+                                        <input type="text" value={settings.favoritesName} onChange={e => setSettings(s => ({ ...s, favoritesName: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground text-sm" />
                                         <p className="text-xs text-muted-foreground mt-2">Clients will see this name when they create Favorites.</p>
                                     </div>
-                                    <div className="flex items-center justify-between px-4 py-4"><p className="text-sm font-medium">Limit selected photos</p><Toggle /></div>
-                                    <div className="flex items-center justify-between px-4 py-4"><p className="text-sm font-medium">Allow comments</p><Toggle /></div>
+                                    <div className="flex items-center justify-between px-4 py-4"><p className="text-sm font-medium">Limit selected photos</p><Toggle checked={settings.limitSelected} onChange={v => setSettings(s => ({ ...s, limitSelected: v }))} /></div>
+                                    <div className="flex items-center justify-between px-4 py-4"><p className="text-sm font-medium">Allow comments</p><Toggle checked={settings.allowComments} onChange={v => setSettings(s => ({ ...s, allowComments: v }))} /></div>
                                 </div>
                                 <div className="rounded-xl border border-muted divide-y divide-muted/50 overflow-hidden">
                                     <div className="flex items-center justify-between px-4 py-4">
@@ -368,10 +506,10 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
                                     </div>
                                     <div className="flex items-center justify-between px-4 py-4">
                                         <div><p className="text-sm font-medium">Require email</p><p className="text-xs text-muted-foreground mt-0.5">Clients will receive an email with a link to their Favorites.</p></div>
-                                        <Toggle defaultChecked />
+                                        <Toggle checked={settings.requireEmail} onChange={v => setSettings(s => ({ ...s, requireEmail: v }))} />
                                     </div>
-                                    <div className="flex items-center justify-between px-4 py-4"><p className="text-sm font-medium">Require phone number</p><Toggle /></div>
-                                    <div className="flex items-center justify-between px-4 py-4"><p className="text-sm font-medium">Require additional info</p><Toggle /></div>
+                                    <div className="flex items-center justify-between px-4 py-4"><p className="text-sm font-medium">Require phone number</p><Toggle checked={settings.requirePhone} onChange={v => setSettings(s => ({ ...s, requirePhone: v }))} /></div>
+                                    <div className="flex items-center justify-between px-4 py-4"><p className="text-sm font-medium">Require additional info</p><Toggle checked={settings.requireInfo} onChange={v => setSettings(s => ({ ...s, requireInfo: v }))} /></div>
                                 </div>
                                 <p className="text-xs text-muted-foreground px-1">Client name is required. Enable extra fields if you need more details from the client.</p>
                             </div>
@@ -385,19 +523,20 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
                             <div className="space-y-4">
                                 <div className="rounded-xl border border-muted p-4 flex items-center justify-between">
                                     <p className="text-sm font-medium">Allow reviews</p>
-                                    <Toggle defaultChecked />
+                                    <Toggle checked={settings.allowReviews} onChange={v => setSettings(s => ({ ...s, allowReviews: v }))} />
                                 </div>
                                 <div className="rounded-xl border border-muted p-4">
                                     <label className="block text-sm font-semibold mb-2">Review message</label>
                                     <textarea
-                                        defaultValue="Please write your review"
+                                        value={settings.reviewMessage}
+                                        onChange={e => setSettings(s => ({ ...s, reviewMessage: e.target.value }))}
                                         className="w-full h-24 px-4 py-3 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground text-sm resize-none"
                                     />
                                     <p className="text-xs text-muted-foreground mt-2">Ask for specific and meaningful feedback.</p>
                                 </div>
                                 <div className="rounded-xl border border-muted p-4 flex items-center justify-between">
                                     <p className="text-sm font-medium">Ask for a review after download</p>
-                                    <Toggle defaultChecked />
+                                    <Toggle checked={settings.askReviewAfterDownload} onChange={v => setSettings(s => ({ ...s, askReviewAfterDownload: v }))} />
                                 </div>
                             </div>
                         )}
@@ -408,15 +547,15 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
                                 <div className="rounded-xl border border-muted divide-y divide-muted/50 overflow-hidden">
                                     <div className="flex items-center justify-between px-4 py-4">
                                         <p className="text-sm font-medium">Show Share button</p>
-                                        <Toggle defaultChecked={true} />
+                                        <Toggle checked={settings.showShareButton} onChange={v => setSettings(s => ({ ...s, showShareButton: v }))} />
                                     </div>
                                     <div className="flex items-center justify-between px-4 py-4">
                                         <p className="text-sm font-medium">Show Business card widget</p>
-                                        <Toggle defaultChecked={true} />
+                                        <Toggle checked={settings.showBusinessCard} onChange={v => setSettings(s => ({ ...s, showBusinessCard: v }))} />
                                     </div>
                                     <div className="flex items-center justify-between px-4 py-4">
                                         <p className="text-sm font-medium">Show your name and website on cover</p>
-                                        <Toggle defaultChecked={true} />
+                                        <Toggle checked={settings.showNameOnCover} onChange={v => setSettings(s => ({ ...s, showNameOnCover: v }))} />
                                     </div>
                                 </div>
                                 <div className="text-center py-8 opacity-50">
@@ -431,19 +570,18 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
                                 <div className="rounded-xl border border-muted p-4">
                                     <div className="flex items-center justify-between mb-4">
                                         <p className="text-sm font-medium">Protect with a password</p>
-                                        <Toggle />
+                                        <Toggle checked={settings.protectWithPassword} onChange={v => setSettings(s => ({ ...s, protectWithPassword: v }))} />
                                     </div>
                                     <div>
                                         <label className="block text-sm font-semibold mb-1.5">Password</label>
                                         <div className="relative">
                                             <input
                                                 type="text"
+                                                value={settings.password}
+                                                onChange={e => setSettings(s => ({ ...s, password: e.target.value }))}
                                                 placeholder="e.g. 54321"
                                                 className="w-full px-4 py-2.5 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground text-sm font-mono pr-10"
                                             />
-                                            <button className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                                            </button>
                                         </div>
                                     </div>
                                     <p className="text-xs text-muted-foreground mt-4">
@@ -454,7 +592,7 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
                                 <div className="rounded-xl border border-muted p-4">
                                     <div className="flex items-center justify-between mb-2">
                                         <p className="text-sm font-medium">Allow guest access</p>
-                                        <Toggle />
+                                        <Toggle checked={settings.allowGuestAccess} onChange={v => setSettings(s => ({ ...s, allowGuestAccess: v }))} />
                                     </div>
                                     <p className="text-xs text-muted-foreground mt-2">
                                         Guests can view the gallery without a password, but they will not see hidden folders or saved Favorites.
@@ -481,45 +619,64 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
 
                 {/* ── DESIGN & COVER ── */}
                 {section === "design" && (
-                    <div className="max-w-2xl">
-                        <h2 className="text-xl font-bold mb-2">Design and Cover</h2>
-                        <p className="text-sm text-muted-foreground mb-8">Customize how your gallery looks for clients.</p>
-                        <div className="relative w-full h-60 rounded-2xl overflow-hidden mb-8 shadow-xl flex items-end p-6" style={{ background: `linear-gradient(135deg, ${coverColor} 0%, ${coverAccent}55 100%)` }}>
-                            {images[0]?.url && <img src={images[0].url} alt="cover" className="absolute inset-0 w-full h-full object-cover opacity-30 mix-blend-overlay" />}
-                            <div className="relative z-10">
-                                <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-1">SECURE DRIVE</p>
-                                <p className="text-white text-3xl font-bold">{clientName}</p>
-                                <p className="text-white/60 text-sm mt-1">{images.length + videos.length} files</p>
-                            </div>
+                    <div className="max-w-4xl slide-up">
+                        <div className="mb-10">
+                            <h2 className="text-2xl font-black tracking-tight">Aesthetic Curation</h2>
+                            <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mt-1">Sculpt the visual persona of this sanctuary</p>
                         </div>
-                        <div className="grid grid-cols-2 gap-6 mb-8">
-                            <div>
-                                <label className="block text-sm font-medium mb-2">Background Color</label>
-                                <div className="flex items-center gap-3 p-3 rounded-xl border border-muted bg-muted/20">
-                                    <input type="color" value={coverColor} onChange={e => setCoverColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent" />
-                                    <span className="text-xs font-mono text-muted-foreground">{coverColor}</span>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium mb-2">Accent Color</label>
-                                <div className="flex items-center gap-3 p-3 rounded-xl border border-muted bg-muted/20">
-                                    <input type="color" value={coverAccent} onChange={e => setCoverAccent(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-0 bg-transparent" />
-                                    <span className="text-xs font-mono text-muted-foreground">{coverAccent}</span>
+
+                        <div className="relative w-full h-[400px] rounded-[3rem] overflow-hidden mb-12 shadow-2xl flex items-end p-12 transition-all duration-700 bg-black/40 border border-white/5" style={{ background: `linear-gradient(135deg, ${coverColor} 0%, ${coverAccent}33 100%)` }}>
+                            {images[0]?.url && (
+                                <img src={images[0].url} alt="cover" className="absolute inset-0 w-full h-full object-cover opacity-20 hover:opacity-30 transition-opacity duration-700" />
+                            )}
+                            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+                            <div className="relative z-10 slide-up">
+                                <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em] mb-4">EXCLUSIVE SECURE DRIVE</p>
+                                <h3 className="text-white text-6xl font-black tracking-tighter mb-4 text-gradient">{clientName}</h3>
+                                <div className="flex items-center gap-4">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                    <p className="text-white/40 text-xs font-bold uppercase tracking-widest">{images.length + videos.length} ASSETS STAGED</p>
                                 </div>
                             </div>
                         </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-12">
+                            <div className="glass-dark p-8 rounded-[2rem] border border-white/5">
+                                <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-6 ml-1">Universal Hue</label>
+                                <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <input type="color" value={coverColor} onChange={e => setCoverColor(e.target.value)} className="w-10 h-10 rounded-xl cursor-pointer border-0 bg-transparent" />
+                                        <span className="text-xs font-mono font-bold text-white/40 tracking-widest uppercase">{coverColor}</span>
+                                    </div>
+                                    <div className="w-2 h-2 rounded-full" style={{ background: coverColor }}></div>
+                                </div>
+                            </div>
+                            <div className="glass-dark p-8 rounded-[2rem] border border-white/5">
+                                <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-6 ml-1">Accent Vibration</label>
+                                <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all">
+                                    <div className="flex items-center gap-4">
+                                        <input type="color" value={coverAccent} onChange={e => setCoverAccent(e.target.value)} className="w-10 h-10 rounded-xl cursor-pointer border-0 bg-transparent" />
+                                        <span className="text-xs font-mono font-bold text-white/40 tracking-widest uppercase">{coverAccent}</span>
+                                    </div>
+                                    <div className="w-2 h-2 rounded-full accent-glow" style={{ background: coverAccent }}></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div>
-                            <label className="block text-sm font-medium mb-3">Cover Photo</label>
-                            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                                {images.slice(0, 6).map((img, idx) => (
-                                    <button key={idx} className="aspect-square rounded-xl overflow-hidden border-2 border-transparent hover:border-foreground transition-all">
-                                        <img src={img.url} alt="" className="w-full h-full object-cover" />
+                            <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-6 ml-1">Cover Asset Selection</label>
+                            <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-8 gap-4 mb-12">
+                                {images.slice(0, 16).map((img, idx) => (
+                                    <button key={idx} className="aspect-square rounded-2xl overflow-hidden border-2 border-white/5 hover:border-blue-500 hover:scale-105 transition-all shadow-xl group">
+                                        <img src={img.url} alt="" className="w-full h-full object-cover group-hover:opacity-60 transition-opacity" />
                                     </button>
                                 ))}
-                                {images.length === 0 && <p className="text-sm text-muted-foreground col-span-6">No photos yet.</p>}
+                                {images.length === 0 && <p className="text-[11px] font-bold text-white/20 col-span-8 py-10 text-center italic border-2 border-dashed border-white/5 rounded-3xl">No visual assets available for selection.</p>}
                             </div>
                         </div>
-                        <button className="mt-8 px-6 py-3 rounded-full bg-foreground text-background font-semibold hover:opacity-90 transition-opacity text-sm">Save Design</button>
+                        <button onClick={handleSaveSettings} className="px-10 py-4 rounded-2xl bg-blue-600 text-white font-black text-xs uppercase tracking-[0.2em] hover:bg-blue-500 transition-all accent-glow active:scale-95 shadow-2xl">
+                            COMMIT DESIGN CHANGES
+                        </button>
                     </div>
                 )}
             </div>
@@ -527,6 +684,14 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
             <style>{`
                 .scrollbar-none { scrollbar-width: none; }
                 .scrollbar-none::-webkit-scrollbar { display: none; }
+                .inverted-scheme::-webkit-calendar-picker-indicator {
+                    filter: invert(1);
+                    opacity: 0.3;
+                    cursor: pointer;
+                }
+                .inverted-scheme::-webkit-calendar-picker-indicator:hover {
+                    opacity: 1;
+                }
             `}</style>
         </div>
     );

@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function Navbar() {
     const router = useRouter();
+    const pathname = usePathname();
     const [user, setUser] = useState<{ name: string, email: string } | null>(null);
 
     useEffect(() => {
@@ -28,6 +30,8 @@ export default function Navbar() {
         return () => window.removeEventListener("auth-change", checkUser);
     }, []);
 
+    if (pathname.startsWith("/admin")) return null;
+
     const handleLogout = () => {
         localStorage.removeItem("wfolio_token");
         localStorage.removeItem("wfolio_user");
@@ -38,8 +42,8 @@ export default function Navbar() {
     return (
         <header className="sticky top-0 z-50 w-full border-b border-muted/20 bg-background/80 backdrop-blur-md">
             <div className="container mx-auto px-6 h-20 flex items-center justify-between">
-                <Link href="/" className="text-2xl font-bold tracking-tight">
-                    LENS<span className="text-muted-foreground font-light">CRAFT</span>
+                <Link href="/" className="text-xl font-black tracking-tighter text-gradient">
+                    LensDrive
                 </Link>
                 <nav className="hidden md:flex items-center gap-8 text-sm font-medium">
                     <Link href="/portfolio" className="hover:text-muted-foreground transition-colors">Portfolio</Link>
