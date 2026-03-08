@@ -10,8 +10,8 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "Photographer Portfolio & Drive",
-  description: "A premium portfolio and client photo delivery platform.",
+  title: "LensFolio | Elevate Your Visual Legacy",
+  description: "A premium portfolio and client photo delivery platform for the modern visionary.",
 };
 
 export default function RootLayout({

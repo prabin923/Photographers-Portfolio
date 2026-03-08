@@ -1,91 +1,141 @@
-"use client";
-
-import React from "react";
-import Image from "next/image";
+import Link from "next/link";
 
 export default function AboutPage() {
     return (
-        <div className="flex flex-col w-full min-h-screen bg-premium-gradient text-white font-sans overflow-x-hidden pt-20">
-            {/* Hero Section */}
-            <section className="relative w-full py-24 mb-20">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-blue-600/5 blur-[120px] rounded-full z-0 h-[400px]"></div>
+        <div className="flex flex-col w-full min-h-screen bg-[#0a0a0a] text-white font-sans overflow-x-hidden">
 
-                <div className="container mx-auto px-10 relative z-10 text-center max-w-4xl">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/5 text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 mb-8 mx-auto shadow-xl slide-up">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
-                        Our Vision
+            {/* ─── HERO ─── */}
+            <section className="relative pt-32 pb-24 px-8 overflow-hidden">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80vw] h-[50vh] bg-blue-600/6 blur-[150px] rounded-full pointer-events-none"></div>
+                <div className="max-w-4xl mx-auto relative z-10 text-center">
+                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/8 text-[11px] font-semibold text-white/40 mb-8 tracking-wide">
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+                        Our story
                     </div>
-                    <h1 className="text-5xl md:text-7xl font-black tracking-tighter mb-8 text-gradient slide-up" style={{ animationDelay: "0.1s" }}>
-                        The Soul Behind <br />
-                        <span className="opacity-40 italic font-medium">The Lens</span>
+                    <h1 className="text-5xl md:text-7xl font-black tracking-[-0.03em] leading-[0.92] mb-8">
+                        Built for photographers<br />
+                        <span className="text-white/20 italic font-light">who mean business.</span>
                     </h1>
-                    <p className="text-lg md:text-xl text-white/40 font-medium leading-relaxed slide-up" style={{ animationDelay: "0.2s" }}>
-                        LensDrive isn't just a platform; it's a sanctuary for visual storytellers. Founded on the belief that every frame holds a universe, we've engineered the ultimate orchestration tool for the modern visionary.
+                    <p className="text-lg md:text-xl text-white/35 font-medium leading-relaxed max-w-2xl mx-auto">
+                        LensFolio is a platform that gives photographers everything they need — a portfolio website, a cloud gallery for clients, and a professional delivery experience — all in one place.
                     </p>
                 </div>
             </section>
 
-            {/* Philosophy Section */}
-            <section className="py-20 bg-black/20">
-                <div className="container mx-auto px-10">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-                        <div className="space-y-8 slide-up">
-                            <h2 className="text-4xl font-black tracking-tight">The Philosophy</h2>
-                            <p className="text-white/40 text-lg leading-relaxed">
-                                We believe technology should fade into the background, leaving only the art and the experience. Our ecosystem is designed to amplify the emotional resonance of your work while providing the precision of a professional studio.
-                            </p>
-                            <div className="space-y-6">
-                                {[
-                                    { title: "Authenticity", desc: "No filters, no compromises. Just the raw emotion captured in its purest form." },
-                                    { title: "Precision", desc: "Every micro-interaction is tuned for high-performance delivery." },
-                                    { title: "Symmetry", desc: "A perfect balance between artistic freedom and structured management." }
-                                ].map((item, i) => (
-                                    <div key={i} className="flex gap-4 group">
-                                        <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-blue-400 font-black border border-white/5 group-hover:bg-blue-500/10 transition-all">
-                                            0{i + 1}
-                                        </div>
-                                        <div>
-                                            <h4 className="font-bold text-lg mb-1">{item.title}</h4>
-                                            <p className="text-white/20 text-sm">{item.desc}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="relative aspect-square lg:aspect-auto h-[600px] slide-up" style={{ animationDelay: "0.3s" }}>
-                            <div className="absolute inset-0 bg-blue-500/10 rounded-[3rem] blur-3xl opacity-20"></div>
-                            <div className="w-full h-full glass-dark rounded-[3rem] border border-white/5 overflow-hidden p-3 relative z-10">
-                                <div className="w-full h-full border border-white/10 rounded-[2.5rem] bg-gradient-to-br from-white/5 to-transparent flex items-center justify-center text-8xl grayscale opacity-20">
-                                    📸
-                                </div>
-                            </div>
-                        </div>
+            {/* ─── MISSION ─── */}
+            <section className="py-24 px-8 border-t border-white/5">
+                <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 mb-6">Our mission</p>
+                        <h2 className="text-4xl font-black tracking-tight mb-6 leading-tight">
+                            Photography deserves better tools.
+                        </h2>
+                        <p className="text-white/35 leading-relaxed mb-6">
+                            We started LensFolio because we were tired of photographers juggling five different apps just to deliver work to a single client. A website builder here, a cloud drive there, an email client over there — it was fragmented and frustrating.
+                        </p>
+                        <p className="text-white/35 leading-relaxed">
+                            So we built one unified platform. Simple enough to set up in an afternoon. Powerful enough to run your entire business.
+                        </p>
                     </div>
-                </div>
-            </section>
-
-            {/* Achievement Section */}
-            <section className="py-32">
-                <div className="container mx-auto px-10 text-center">
-                    <h2 className="text-3xl font-black mb-16 tracking-tight fade-in">Global Recognition</h2>
-                    <div className="flex flex-wrap justify-center gap-12 opacity-30 grayscale hover:grayscale-0 transition-all duration-700">
-                        {["MASTERCLASS 2024", "VOGUE ART", "VISUAL EXCELLENCE", "PURE PHOTOGRAPHY", "MODERN VISION"].map((brand, i) => (
-                            <span key={i} className="text-sm font-black tracking-[0.4em] uppercase">{brand}</span>
+                    <div className="grid grid-cols-2 gap-4">
+                        {[
+                            { value: "100+", label: "Photographers" },
+                            { value: "5K+", label: "Galleries delivered" },
+                            { value: "120 GB", label: "Storage per user" },
+                            { value: "2026", label: "Founded" },
+                        ].map((stat, i) => (
+                            <div key={i} className="bg-white/[0.03] border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-all">
+                                <p className="text-3xl font-black text-white mb-1">{stat.value}</p>
+                                <p className="text-xs font-bold uppercase tracking-widest text-white/25">{stat.label}</p>
+                            </div>
                         ))}
                     </div>
                 </div>
             </section>
 
-            {/* CTA Section */}
-            <section className="py-40 bg-white/5 border-t border-white/5">
-                <div className="max-w-4xl mx-auto px-10 text-center slide-up">
-                    <h2 className="text-4xl md:text-5xl font-black mb-8 tracking-tighter">Join the movement.</h2>
-                    <p className="text-lg text-white/30 mb-12 font-medium leading-relaxed">
-                        Become part of the most exclusive community of photographers who are setting the new gold standard for client delivery.
+            {/* ─── VALUES ─── */}
+            <section className="py-24 px-8 border-t border-white/5 bg-white/[0.01]">
+                <div className="max-w-6xl mx-auto">
+                    <div className="text-center mb-16">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 mb-4">What we believe</p>
+                        <h2 className="text-4xl font-black tracking-tight">The principles we build on</h2>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-white/5 rounded-3xl overflow-hidden border border-white/5">
+                        {[
+                            {
+                                icon: "◈",
+                                title: "Simplicity first",
+                                desc: "Every feature we build has to earn its place. If it doesn't make photographers' lives easier, it doesn't ship.",
+                            },
+                            {
+                                icon: "✦",
+                                title: "Design matters",
+                                desc: "Photographers have an eye for beauty. We hold our product to the same standard — every pixel should feel intentional.",
+                            },
+                            {
+                                icon: "◉",
+                                title: "Privacy by default",
+                                desc: "Client galleries are private by nature. We treat your work and your clients' data with the seriousness they deserve.",
+                            },
+                        ].map((v, i) => (
+                            <div key={i} className="bg-[#0a0a0a] p-10 hover:bg-white/[0.02] transition-colors group">
+                                <div className="text-2xl text-white/20 mb-6 group-hover:text-white/50 transition-colors">{v.icon}</div>
+                                <h3 className="text-lg font-black mb-3 group-hover:text-blue-400 transition-colors">{v.title}</h3>
+                                <p className="text-sm text-white/30 leading-relaxed">{v.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* ─── TEAM ─── */}
+            <section className="py-24 px-8 border-t border-white/5">
+                <div className="max-w-6xl mx-auto">
+                    <div className="text-center mb-16">
+                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 mb-4">The team</p>
+                        <h2 className="text-4xl font-black tracking-tight">Made by a small, focused team</h2>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+                        {[
+                            { name: "Prabin Sharma", role: "Founder & Developer", initials: "PS" },
+                            { name: "Design Lead", role: "UI & Experience", initials: "DL" },
+                            { name: "You?", role: "We're building this together", initials: "?" },
+                        ].map((member, i) => (
+                            <div key={i} className="bg-white/[0.03] border border-white/5 rounded-2xl p-6 text-center hover:border-white/10 transition-all group">
+                                <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center text-lg font-black text-white/30 mx-auto mb-4 group-hover:bg-blue-500/10 group-hover:text-blue-400 transition-all">
+                                    {member.initials}
+                                </div>
+                                <p className="font-black text-sm">{member.name}</p>
+                                <p className="text-xs text-white/25 mt-1">{member.role}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* ─── CTA ─── */}
+            <section className="py-32 px-8 border-t border-white/5 relative overflow-hidden">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-[50vw] h-[50vw] bg-blue-600/4 rounded-full blur-[140px]"></div>
+                </div>
+                <div className="relative z-10 max-w-2xl mx-auto text-center">
+                    <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-6 leading-tight">
+                        Ready to simplify<br />
+                        <span className="text-white/20 italic font-light">your workflow?</span>
+                    </h2>
+                    <p className="text-white/30 text-lg font-medium mb-10 leading-relaxed">
+                        Join LensFolio and spend less time managing tools — and more time behind the lens.
                     </p>
-                    <button className="px-12 py-6 rounded-3xl bg-white text-black font-black text-sm uppercase tracking-widest hover:scale-105 transition-all accent-glow">
-                        Connect With Us
-                    </button>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                        <Link href="/login"
+                            className="px-8 py-4 rounded-2xl bg-white text-black font-black text-sm uppercase tracking-widest hover:bg-white/90 hover:scale-[1.02] transition-all shadow-[0_0_40px_rgba(255,255,255,0.08)]">
+                            Get started free
+                        </Link>
+                        <Link href="/signup"
+                            className="px-8 py-4 rounded-2xl border border-white/10 text-sm font-semibold text-white/50 hover:text-white hover:border-white/20 transition-all">
+                            Create account →
+                        </Link>
+                    </div>
                 </div>
             </section>
         </div>

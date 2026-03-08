@@ -72,6 +72,16 @@ body {
   }
 }
 
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
 /* Premium Design Utilities */
 .glass {
   background: rgba(255, 255, 255, 0.03);
@@ -89,6 +99,18 @@ body {
 
 .bg-premium-gradient {
   background: radial-gradient(circle at top left, #1a1a1a, #0a0a0a);
+}
+
+.theme-dark {
+  background: radial-gradient(circle at top left, #1a1a1a, #0a0a0a);
+}
+
+.theme-midnight {
+  background: linear-gradient(135deg, #020617 0%, #1e1b4b 50%, #020617 100%);
+}
+
+.theme-elegant {
+  background: linear-gradient(135deg, #18181b 0%, #4c0519 50%, #18181b 100%);
 }
 
 .accent-glow {
