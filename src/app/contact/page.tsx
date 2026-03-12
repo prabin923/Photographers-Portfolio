@@ -31,7 +31,7 @@ export default function ContactPage() {
     const [site, setSite] = useState<SiteContactData>(defaults);
 
     useEffect(() => {
-        fetch("http://localhost:4000/api/site")
+        fetch("/api/site")
             .then(res => res.json())
             .then(data => setSite({ ...defaults, ...data }))
             .catch(() => { });

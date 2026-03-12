@@ -37,7 +37,7 @@ export default function NewDrivePage() {
                 formData.append("files", file);
             });
 
-            const res = await fetch("http://localhost:4000/api/drives", {
+            const res = await fetch("/api/drives", {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${token}`

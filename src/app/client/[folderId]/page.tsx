@@ -100,7 +100,7 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
     const galleryLink = `http://localhost:3000/client/${folderId}`;
 
     const fetchDrive = useCallback(() => {
-        fetch(`http://localhost:4000/api/drive/client/${folderId}`)
+        fetch(`/api/drive/client/${folderId}`)
             .then(res => { if (!res.ok) throw new Error(); return res.json(); })
             .then(data => {
                 const name = data.clientName || "Your Gallery";
@@ -151,7 +151,7 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
 
         // Sync with backend
         try {
-            await fetch(`http://localhost:4000/api/drives/${folderId}/settings`, {
+            await fetch(`/api/drives/${folderId}/settings`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ favorites: Array.from(nextLiked) })
@@ -175,7 +175,7 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
         try {
             const formData = new FormData();
             uploadFiles.forEach(f => formData.append("files", f));
-            const res = await fetch(`http://localhost:4000/api/drives/${folderId}/upload`, { method: "PATCH", body: formData });
+            const res = await fetch(`/api/drives/${folderId}/upload`, { method: "PATCH", body: formData });
             if (!res.ok) throw new Error();
             setUploadFiles([]); setUploadSuccess(true); fetchDrive();
             setTimeout(() => setUploadSuccess(false), 3000);
@@ -185,7 +185,7 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
 
     const handleSaveSettings = async () => {
         try {
-            const res = await fetch(`http://localhost:4000/api/drives/${folderId}/settings`, {
+            const res = await fetch(`/api/drives/${folderId}/settings`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -208,7 +208,7 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
         if (!confirm("Delete this gallery? This cannot be undone.")) return;
 
         try {
-            const res = await fetch(`http://localhost:4000/api/drives/${folderId}`, {
+            const res = await fetch(`/api/drives/${folderId}`, {
                 method: "DELETE"
             });
 

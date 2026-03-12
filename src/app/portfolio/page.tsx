@@ -21,7 +21,7 @@ export default function PortfolioPage() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        fetch("http://localhost:4000/api/site")
+        fetch("/api/site")
             .then(res => res.json())
             .then(data => {
                 if (data.portfolioPhotos?.length > 0) setPhotos(data.portfolioPhotos);

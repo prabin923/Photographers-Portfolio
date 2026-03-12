@@ -89,7 +89,7 @@ export default function AdminDashboard() {
     const fetchPlanInfo = useCallback(async () => {
         try {
             const token = localStorage.getItem("wfolio_token");
-            const res = await fetch("http://localhost:4000/api/plan", { headers: { "Authorization": `Bearer ${token}` } });
+            const res = await fetch("/api/plan", { headers: { "Authorization": `Bearer ${token}` } });
             const data = await res.json();
             setPlanInfo(data);
         } catch (e) { console.error("Failed to load plan", e); }
@@ -98,7 +98,7 @@ export default function AdminDashboard() {
     const fetchDrives = useCallback(async () => {
         try {
             const token = localStorage.getItem("wfolio_token");
-            const res = await fetch("http://localhost:4000/api/drives", { headers: { "Authorization": `Bearer ${token}` } });
+            const res = await fetch("/api/drives", { headers: { "Authorization": `Bearer ${token}` } });
             const data = await res.json();
             if (data.drives) setDrives(data.drives);
         } catch (e) { console.error("Failed to load drives", e); }
@@ -108,7 +108,7 @@ export default function AdminDashboard() {
     const fetchSiteSettings = useCallback(async () => {
         try {
             const token = localStorage.getItem("wfolio_token");
-            const res = await fetch("http://localhost:4000/api/site", { headers: { "Authorization": `Bearer ${token}` } });
+            const res = await fetch("/api/site", { headers: { "Authorization": `Bearer ${token}` } });
             const data = await res.json();
             setSite({ ...defaultSite, ...data });
             setIsPublished(true);
@@ -151,7 +151,7 @@ export default function AdminDashboard() {
             const token = localStorage.getItem("wfolio_token");
             const formData = new FormData();
             uploadFiles.forEach(f => formData.append("files", f));
-            const res = await fetch(`http://localhost:4000/api/drives/${driveId}/upload`, { method: "PATCH", headers: { "Authorization": `Bearer ${token}` }, body: formData });
+            const res = await fetch(`/api/drives/${driveId}/upload`, { method: "PATCH", headers: { "Authorization": `Bearer ${token}` }, body: formData });
             if (!res.ok) throw new Error("Upload failed");
             await fetchDrives();
             setExpandedId(null);
@@ -164,7 +164,7 @@ export default function AdminDashboard() {
         if (!confirm("Permanently delete this gallery? This cannot be undone.")) return;
         try {
             const token = localStorage.getItem("wfolio_token");
-            const res = await fetch(`http://localhost:4000/api/drives/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
+            const res = await fetch(`/api/drives/${id}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
             if (res.ok) setDrives(prev => prev.filter(d => d.id !== id));
         } catch (e) { console.error("Delete error:", e); }
     };
@@ -179,7 +179,7 @@ export default function AdminDashboard() {
             formData.append("remainingPhotoIds", JSON.stringify(site.portfolioPhotos.map(p => p.id)));
             newPortfolioFiles.forEach(f => formData.append("newPhotos", f));
             const token = localStorage.getItem("wfolio_token");
-            const res = await fetch("http://localhost:4000/api/site", { method: "POST", headers: { "Authorization": `Bearer ${token}` }, body: formData });
+            const res = await fetch("/api/site", { method: "POST", headers: { "Authorization": `Bearer ${token}` }, body: formData });
             if (!res.ok) throw new Error("Save failed");
             const data = await res.json();
             setSite({ ...defaultSite, ...data.settings });
@@ -228,7 +228,7 @@ export default function AdminDashboard() {
         setIsUpgrading(true);
         try {
             const token = localStorage.getItem("wfolio_token");
-            const res = await fetch("http://localhost:4000/api/plan/upgrade", {
+            const res = await fetch("/api/plan/upgrade", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
