@@ -29,11 +29,23 @@ export default function LoginPage() {
                 throw new Error(data.error || "Failed to log in");
             }
 
-            // Store token (in a real app, use HttpOnly cookies)
+            // Store token
             localStorage.setItem("wfolio_token", data.token);
             localStorage.setItem("wfolio_user", JSON.stringify(data.user));
-            window.dispatchEvent(new Event("auth-change"));
 
+            // Save to saved accounts list for account switching
+            const savedRaw = localStorage.getItem("wfolio_saved_accounts");
+            const savedAccounts: { id: string; name: string; email: string; token: string }[] = savedRaw ? JSON.parse(savedRaw) : [];
+            const existingIdx = savedAccounts.findIndex(a => a.id === data.user.id);
+            const accountEntry = { id: data.user.id, name: data.user.name, email: data.user.email, token: data.token };
+            if (existingIdx >= 0) {
+                savedAccounts[existingIdx] = accountEntry;
+            } else {
+                savedAccounts.push(accountEntry);
+            }
+            localStorage.setItem("wfolio_saved_accounts", JSON.stringify(savedAccounts));
+
+            window.dispatchEvent(new Event("auth-change"));
             router.push("/admin");
         } catch (err: any) {
             setError(err.message);

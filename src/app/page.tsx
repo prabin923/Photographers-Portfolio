@@ -183,8 +183,8 @@ export default function Home() {
       <section id="pricing" className="py-24 px-8 border-t border-white/5 bg-white/[0.01]">
         <div className="max-w-5xl mx-auto text-center">
           <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 mb-4">Simple pricing</p>
-          <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-16">One plan. Everything included.</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+          <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-16">Plans for every creative journey.</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {[
               {
                 name: "Free",
@@ -202,6 +202,14 @@ export default function Home() {
                 features: ["Unlimited portfolio site", "Unlimited galleries", "120 GB storage", "All premium themes", "Custom accent colors", "Priority support"],
                 cta: "Start free trial",
                 highlight: true,
+              },
+              {
+                name: "Business",
+                price: "$29",
+                period: "per month",
+                features: ["Everything in Pro", "500 GB storage", "Custom domain support", "White-label experience", "4K video hosting", "VIP support"],
+                cta: "Get Business",
+                highlight: false,
               },
             ].map((plan, i) => (
               <div key={i} className={`relative rounded-3xl p-8 text-left border transition-all hover:scale-[1.01] ${plan.highlight ? "bg-white text-black border-white shadow-[0_0_60px_rgba(255,255,255,0.08)]" : "bg-white/3 border-white/8 hover:border-white/15"}`}>

@@ -17,7 +17,7 @@ export default function ClientPortal() {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        fetch("http://localhost:4000/api/drives")
+        fetch("http://localhost:4000/api/drives/public")
             .then((res) => res.json())
             .then((data) => {
                 setDrives(data.drives || []);

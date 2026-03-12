@@ -50,6 +50,8 @@ const NAV_SECTIONS = [
     { id: "contact", label: "Contact", icon: "⊕", desc: "Email, phone & socials" },
 ];
 
+interface SavedAccount { id: string; name: string; email: string; token: string; }
+
 export default function AdminDashboard() {
     const router = useRouter();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -73,6 +75,26 @@ export default function AdminDashboard() {
     const [iframeKey, setIframeKey] = useState(0);
     const portfolioFileRef = useRef<HTMLInputElement>(null);
 
+    // Account Switcher
+    const [currentUser, setCurrentUser] = useState<{ id?: string; name: string; email: string } | null>(null);
+    const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
+    const [showSwitcher, setShowSwitcher] = useState(false);
+    const switcherRef = useRef<HTMLDivElement>(null);
+
+    // Plan & Storage
+    const [planInfo, setPlanInfo] = useState<{ plan: { id: string; name: string; storageLimitGB: number; maxGalleries: number; price: number; period: string }; storage: { usedGB: number; limitGB: number; percentUsed: number }; galleries: { count: number; limit: number } } | null>(null);
+    const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+    const [isUpgrading, setIsUpgrading] = useState(false);
+
+    const fetchPlanInfo = useCallback(async () => {
+        try {
+            const token = localStorage.getItem("wfolio_token");
+            const res = await fetch("http://localhost:4000/api/plan", { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+            setPlanInfo(data);
+        } catch (e) { console.error("Failed to load plan", e); }
+    }, []);
+
     const fetchDrives = useCallback(async () => {
         try {
             const token = localStorage.getItem("wfolio_token");
@@ -85,7 +107,8 @@ export default function AdminDashboard() {
 
     const fetchSiteSettings = useCallback(async () => {
         try {
-            const res = await fetch("http://localhost:4000/api/site");
+            const token = localStorage.getItem("wfolio_token");
+            const res = await fetch("http://localhost:4000/api/site", { headers: { "Authorization": `Bearer ${token}` } });
             const data = await res.json();
             setSite({ ...defaultSite, ...data });
             setIsPublished(true);
@@ -100,8 +123,23 @@ export default function AdminDashboard() {
             setIsAuthenticated(true);
             fetchDrives();
             fetchSiteSettings();
+            fetchPlanInfo();
         }
+        // Load current user + saved accounts
+        const storedUser = localStorage.getItem("wfolio_user");
+        if (storedUser) { try { setCurrentUser(JSON.parse(storedUser)); } catch { } }
+        const raw = localStorage.getItem("wfolio_saved_accounts");
+        if (raw) { try { setSavedAccounts(JSON.parse(raw)); } catch { } }
     }, [router, fetchDrives, fetchSiteSettings]);
+
+    // Close switcher on outside click
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) setShowSwitcher(false);
+        };
+        if (showSwitcher) document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, [showSwitcher]);
 
     // Block render until auth is confirmed
     if (!isAuthenticated) return null;
@@ -140,7 +178,8 @@ export default function AdminDashboard() {
             fields.forEach(f => formData.append(f, site[f] as string));
             formData.append("remainingPhotoIds", JSON.stringify(site.portfolioPhotos.map(p => p.id)));
             newPortfolioFiles.forEach(f => formData.append("newPhotos", f));
-            const res = await fetch("http://localhost:4000/api/site", { method: "POST", body: formData });
+            const token = localStorage.getItem("wfolio_token");
+            const res = await fetch("http://localhost:4000/api/site", { method: "POST", headers: { "Authorization": `Bearer ${token}` }, body: formData });
             if (!res.ok) throw new Error("Save failed");
             const data = await res.json();
             setSite({ ...defaultSite, ...data.settings });
@@ -159,6 +198,53 @@ export default function AdminDashboard() {
 
     const filteredDrives = drives.filter(d => d.clientName.toLowerCase().includes(searchQuery.toLowerCase()));
     const previewUrls = { portfolio: "http://localhost:3000/portfolio", about: "http://localhost:3000/about", contact: "http://localhost:3000/contact" };
+
+    const getInitials = (name: string) => name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+
+    const handleSwitchAccount = (account: SavedAccount) => {
+        localStorage.setItem("wfolio_token", account.token);
+        localStorage.setItem("wfolio_user", JSON.stringify({ id: account.id, name: account.name, email: account.email }));
+        window.dispatchEvent(new Event("auth-change"));
+        setShowSwitcher(false);
+        window.location.reload();
+    };
+
+    const handleRemoveSavedAccount = (accountId: string) => {
+        const updated = savedAccounts.filter(a => a.id !== accountId);
+        setSavedAccounts(updated);
+        localStorage.setItem("wfolio_saved_accounts", JSON.stringify(updated));
+        if (currentUser?.id === accountId) handleLogout();
+    };
+
+    const handleLogout = () => {
+        localStorage.removeItem("wfolio_token");
+        localStorage.removeItem("wfolio_user");
+        window.dispatchEvent(new Event("auth-change"));
+        setShowSwitcher(false);
+        router.push("/login");
+    };
+
+    const handleUpgrade = async (planId: string) => {
+        setIsUpgrading(true);
+        try {
+            const token = localStorage.getItem("wfolio_token");
+            const res = await fetch("http://localhost:4000/api/plan/upgrade", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ planId })
+            });
+            if (!res.ok) throw new Error("Failed to upgrade plan");
+            await fetchPlanInfo();
+            setShowUpgradeModal(false);
+        } catch (e) {
+            console.error("Upgrade error:", e);
+        } finally {
+            setIsUpgrading(false);
+        }
+    };
 
     const PREVIEW_PAGES = [
         { id: "portfolio" as const, label: "Portfolio" },
@@ -198,14 +284,40 @@ export default function AdminDashboard() {
                     ))}
                 </nav>
 
-                <div className="p-4 border-t border-white/5">
+                <div className="p-4 border-t border-white/5 space-y-3">
+                    {/* Plan badge */}
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2">
+                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${planInfo?.plan.id === 'business' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' :
+                                planInfo?.plan.id === 'pro' ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' :
+                                    'bg-white/5 text-white/30 border border-white/5'
+                                }`}>{planInfo?.plan.name || 'Free'}</span>
+                        </div>
+                        <button onClick={() => setShowUpgradeModal(true)} className="text-[9px] font-bold text-blue-400 hover:text-blue-300 transition-colors">
+                            {planInfo?.plan.id === 'business' ? 'Manage' : 'Upgrade'}
+                        </button>
+                    </div>
+
+                    {/* Storage bar */}
                     <div className="bg-white/3 rounded-2xl p-4 border border-white/5">
                         <div className="flex justify-between items-center mb-3">
                             <p className="text-[9px] font-black uppercase tracking-widest text-white/30">Storage</p>
-                            <p className="text-[9px] font-bold text-blue-400">Upgrade</p>
+                            <p className="text-[9px] font-bold text-white/20">{planInfo?.storage.percentUsed || 0}%</p>
                         </div>
-                        <div className="w-full h-1 bg-white/5 rounded-full mb-2"><div className="h-full bg-blue-500 rounded-full" style={{ width: "11.3%" }}></div></div>
-                        <p className="text-[10px] text-white/30">13.6 GB of 120 GB</p>
+                        <div className="w-full h-1.5 bg-white/5 rounded-full mb-2 overflow-hidden">
+                            <div className={`h-full rounded-full transition-all duration-500 ${(planInfo?.storage.percentUsed || 0) > 90 ? 'bg-rose-500' :
+                                (planInfo?.storage.percentUsed || 0) > 70 ? 'bg-amber-500' : 'bg-blue-500'
+                                }`} style={{ width: `${Math.min(planInfo?.storage.percentUsed || 0, 100)}%` }}></div>
+                        </div>
+                        <p className="text-[10px] text-white/30">{planInfo?.storage.usedGB || 0} GB of {planInfo?.storage.limitGB || 5} GB</p>
+                    </div>
+
+                    {/* Gallery count */}
+                    <div className="px-1 flex items-center justify-between">
+                        <p className="text-[9px] text-white/20">Galleries</p>
+                        <p className="text-[9px] font-bold text-white/30">
+                            {planInfo?.galleries.count || 0} / {planInfo?.galleries.limit === -1 ? '∞' : (planInfo?.galleries.limit || 3)}
+                        </p>
                     </div>
                 </div>
             </aside>
@@ -247,10 +359,89 @@ export default function AdminDashboard() {
                                 </button>
                             </>
                         )}
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-white/10 flex items-center justify-center text-blue-400 font-black text-xs glass">A</div>
+                        {/* Account Switcher */}
+                        <div className="relative" ref={switcherRef}>
+                            <button onClick={() => setShowSwitcher(!showSwitcher)}
+                                className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold transition-all duration-200 border-2 hover:scale-110"
+                                style={{
+                                    background: `linear-gradient(135deg, ${site.accentColor || '#3b82f6'}40, ${site.accentColor || '#3b82f6'}20)`,
+                                    borderColor: showSwitcher ? (site.accentColor || '#3b82f6') : 'rgba(255,255,255,0.1)',
+                                    color: 'white',
+                                }}
+                                title={currentUser?.name || 'Account'}>
+                                {currentUser ? getInitials(currentUser.name) : 'A'}
+                            </button>
+
+                            {showSwitcher && (
+                                <div className="absolute right-0 top-12 w-72 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[200]"
+                                    style={{ animation: 'adminSwitcherIn 0.2s ease-out' }}>
+                                    {/* Current account */}
+                                    <div className="px-4 pt-4 pb-3 border-b border-white/5">
+                                        <p className="text-[9px] font-black uppercase tracking-widest text-white/25 mb-3">Current Account</p>
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                                                style={{ background: `linear-gradient(135deg, ${site.accentColor || '#3b82f6'}, ${site.accentColor || '#3b82f6'}80)`, color: 'white' }}>
+                                                {currentUser ? getInitials(currentUser.name) : 'A'}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-bold text-white truncate">{currentUser?.name || 'User'}</p>
+                                                <p className="text-[11px] text-white/30 truncate">{currentUser?.email}</p>
+                                            </div>
+                                            <div className="ml-auto shrink-0">
+                                                <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.5)]"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Other saved accounts */}
+                                    {savedAccounts.filter(a => a.id !== currentUser?.id).length > 0 && (
+                                        <div className="px-4 pt-3 pb-2">
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-white/25 mb-2">Switch To</p>
+                                            <div className="space-y-1">
+                                                {savedAccounts.filter(a => a.id !== currentUser?.id).map(account => (
+                                                    <div key={account.id} className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/5 transition-colors group cursor-pointer"
+                                                        onClick={() => handleSwitchAccount(account)}>
+                                                        <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-[10px] font-bold text-white/50 shrink-0">
+                                                            {getInitials(account.name)}
+                                                        </div>
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="text-xs font-semibold text-white/70 group-hover:text-white truncate transition-colors">{account.name}</p>
+                                                            <p className="text-[10px] text-white/20 truncate">{account.email}</p>
+                                                        </div>
+                                                        <button onClick={(e) => { e.stopPropagation(); handleRemoveSavedAccount(account.id); }}
+                                                            className="opacity-0 group-hover:opacity-100 text-white/20 hover:text-rose-400 transition-all p-1" title="Remove">
+                                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Actions */}
+                                    <div className="border-t border-white/5 p-2">
+                                        <Link href="/login" onClick={() => setShowSwitcher(false)}
+                                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-white/40 hover:text-white hover:bg-white/5 transition-all">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                                            </svg>
+                                            Add another account
+                                        </Link>
+                                        <button onClick={handleLogout}
+                                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium text-rose-400/60 hover:text-rose-400 hover:bg-rose-400/5 transition-all">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                                            </svg>
+                                            Log out
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
+                    <style>{`@keyframes adminSwitcherIn { from { opacity: 0; transform: translateY(-8px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
                 </header>
 
                 {/* ═══════════════════════════════════════════════ */}
@@ -603,6 +794,70 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                 )}
+            </div>
+            <UpgradeModal
+                isOpen={showUpgradeModal}
+                onClose={() => setShowUpgradeModal(false)}
+                currentPlanId={planInfo?.plan.id || 'free'}
+                onUpgrade={handleUpgrade}
+                isUpgrading={isUpgrading}
+            />
+        </div>
+    );
+}
+
+function UpgradeModal({ isOpen, onClose, currentPlanId, onUpgrade, isUpgrading }: { isOpen: boolean; onClose: () => void; currentPlanId: string; onUpgrade: (id: string) => void; isUpgrading: boolean }) {
+    if (!isOpen) return null;
+
+    const plans = [
+        { id: 'free', name: 'Free', price: '$0', storage: '5 GB', galleries: '3 Galleries', color: 'gray' },
+        { id: 'pro', name: 'Pro', price: '$12', storage: '120 GB', galleries: 'Unlimited', color: 'blue' },
+        { id: 'business', name: 'Business', price: '$29', storage: '500 GB', galleries: 'Unlimited', color: 'amber' },
+    ];
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={onClose}></div>
+            <div className="relative w-full max-w-4xl bg-zinc-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+                <div className="p-8 border-b border-white/5 flex items-center justify-between">
+                    <div>
+                        <h2 className="text-2xl font-black tracking-tight">Expand your potential</h2>
+                        <p className="text-white/30 text-sm mt-1">Choose a plan that fits your growth</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full transition-colors text-white/30 hover:text-white">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+                <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {plans.map((p) => (
+                        <div key={p.id} className={`p-6 rounded-2xl border transition-all ${currentPlanId === p.id ? 'bg-white/5 border-blue-500/50' : 'bg-black/20 border-white/5 hover:border-white/10'}`}>
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 className="font-bold text-lg">{p.name}</h3>
+                                    <p className="text-2xl font-black mt-1">{p.price}<span className="text-xs font-medium text-white/20 ml-1">/mo</span></p>
+                                </div>
+                                {currentPlanId === p.id && <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-blue-500 text-white leading-none">Current</span>}
+                            </div>
+                            <ul className="space-y-3 mb-8">
+                                <li className="flex items-center gap-2 text-sm text-white/60">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                    {p.storage} Storage
+                                </li>
+                                <li className="flex items-center gap-2 text-sm text-white/60">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                    {p.galleries}
+                                </li>
+                            </ul>
+                            <button
+                                onClick={() => onUpgrade(p.id)}
+                                disabled={currentPlanId === p.id || isUpgrading}
+                                className={`w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${currentPlanId === p.id ? 'bg-white/5 text-white/30 cursor-default' : p.id === 'pro' ? 'bg-blue-600 hover:bg-blue-500 text-white' : p.id === 'business' ? 'bg-amber-500 hover:bg-amber-400 text-black' : 'bg-white/10 hover:bg-white/20 text-white'}`}
+                            >
+                                {isUpgrading ? 'Upgrading...' : currentPlanId === p.id ? 'Active Plan' : `Switch to ${p.name}`}
+                            </button>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
