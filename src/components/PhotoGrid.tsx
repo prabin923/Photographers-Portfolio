@@ -20,7 +20,7 @@ const getStableHeight = (id: string) => {
     for (let i = 0; i < id.length; i++) {
         hash = id.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const sizes = [120, 100, 85, 70];
+    const sizes = [120, 100, 135, 85, 150, 70];
     return sizes[Math.abs(hash) % sizes.length];
 };
 
@@ -55,104 +55,62 @@ export default function PhotoGrid({ photos, enableLikes, onLike, likedPhotos }: 
         return () => { window.removeEventListener("keydown", handler); document.body.style.overflow = ""; };
     }, [lightboxIndex, goNext, goPrev]);
 
+    const downloadPhoto = async (url: string, id: string) => {
+        try {
+            const res = await fetch(cleanUrl(url));
+            const blob = await res.blob();
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `photo-${id}.jpg`;
+            link.click();
+        } catch (e) {
+            window.open(cleanUrl(url), "_blank");
+        }
+    };
+
     if (photos.length === 0) return (
-        <div className="py-32 flex flex-col items-center gap-4 text-center">
-            <div className="w-20 h-20 rounded-3xl bg-white/5 flex items-center justify-center text-4xl opacity-30">🖼</div>
-            <p className="text-white/20 text-sm font-medium">No photos uploaded yet. Drag & drop above to add some.</p>
+        <div className="py-40 flex flex-col items-center gap-6 text-center animate-fade-in">
+            <div className="w-24 h-24 rounded-[2.5rem] bg-white/[0.03] border border-white/5 flex items-center justify-center text-5xl opacity-40">🖼</div>
+            <div>
+                <p className="text-white/40 font-black text-lg uppercase tracking-widest">No Photos Found</p>
+                <p className="text-white/10 text-sm mt-1">This collection is currently empty.</p>
+            </div>
         </div>
     );
 
     const currentPhoto = lightboxIndex !== null ? photos[lightboxIndex] : null;
 
-    // 1-photo: full bleed hero
-    if (photos.length === 1) return (
-        <>
-            <div className="relative w-full rounded-3xl overflow-hidden cursor-zoom-in group"
-                style={{ maxHeight: "70vh" }}
-                onClick={() => openLightbox(0)}>
-                <img src={cleanUrl(photos[0].url)} alt=""
-                    className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-700 bg-white/5"
-                    style={{ maxHeight: "70vh", color: "transparent" }}
-                    onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.classList.add('bg-white/5'); }} />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-8">
-                    <div>
-                        {photos[0].title && <p className="text-white font-bold text-lg">{photos[0].title}</p>}
-                        <p className="text-white/50 text-sm mt-1">Click to view full size</p>
-                    </div>
-                </div>
-                {enableLikes && onLike && (
-                    <button onClick={(e) => { e.stopPropagation(); onLike(photos[0].id); }}
-                        className={`absolute top-4 right-4 p-3 rounded-full backdrop-blur-md border transition-all duration-300 ${likedPhotos?.has(photos[0].id) ? "bg-rose-500 border-rose-400 text-white shadow-[0_0_20px_rgba(244,63,94,0.5)] scale-110" : "bg-black/30 border-white/10 text-white opacity-0 group-hover:opacity-100"}`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={likedPhotos?.has(photos[0].id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-5 h-5">
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                        </svg>
-                    </button>
-                )}
-            </div>
-            <LightboxPanel currentPhoto={currentPhoto} lightboxIndex={lightboxIndex} photos={photos}
-                imgLoaded={imgLoaded} setImgLoaded={setImgLoaded} closeLightbox={closeLightbox}
-                goNext={goNext} goPrev={goPrev} enableLikes={enableLikes} onLike={onLike}
-                likedPhotos={likedPhotos} setLightboxIndex={setLightboxIndex} />
-        </>
-    );
-
-    // 2-3 photos: side-by-side row
-    if (photos.length <= 3) return (
-        <>
-            <div className={`grid gap-3 ${photos.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
-                {photos.map((photo, i) => (
-                    <div key={photo.id} className="relative rounded-2xl overflow-hidden cursor-zoom-in group"
-                        style={{ aspectRatio: "3/4" }}
-                        onClick={() => openLightbox(i)}>
-                        <img src={cleanUrl(photo.url)} alt=""
-                            className="w-full h-full object-cover group-hover:scale-[1.04] transition-transform duration-700 bg-white/5"
-                            style={{ color: "transparent" }}
-                            onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.classList.add('bg-white/5'); }} />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-400 flex items-end p-4">
-                            {photo.title && <p className="text-white text-sm font-medium">{photo.title}</p>}
-                        </div>
-                        {enableLikes && onLike && (
-                            <button onClick={(e) => { e.stopPropagation(); onLike(photo.id); }}
-                                className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-md border transition-all duration-200 ${likedPhotos?.has(photo.id) ? "bg-rose-500 border-rose-400 text-white shadow-[0_0_12px_rgba(244,63,94,0.5)] scale-110" : "bg-black/30 border-white/10 text-white opacity-0 group-hover:opacity-100"}`}>
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={likedPhotos?.has(photo.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                                </svg>
-                            </button>
-                        )}
-                    </div>
-                ))}
-            </div>
-            <LightboxPanel currentPhoto={currentPhoto} lightboxIndex={lightboxIndex} photos={photos}
-                imgLoaded={imgLoaded} setImgLoaded={setImgLoaded} closeLightbox={closeLightbox}
-                goNext={goNext} goPrev={goPrev} enableLikes={enableLikes} onLike={onLike}
-                likedPhotos={likedPhotos} setLightboxIndex={setLightboxIndex} />
-        </>
-    );
-
-    // 4+ photos: masonry
     return (
         <>
-            <div className="columns-2 sm:columns-3 lg:columns-4 gap-3 [column-fill:_balance]">
+            <div className="columns-2 sm:columns-3 lg:columns-4 gap-6 [column-fill:_balance]">
                 {photos.map((photo, i) => {
                     const h = getStableHeight(photo.id);
                     return (
                         <div key={photo.id}
-                            className="relative group break-inside-avoid mb-3 rounded-2xl overflow-hidden cursor-zoom-in"
-                            style={{ animationDelay: `${(i % 8) * 0.05}s` }}
+                            className="relative group break-inside-avoid mb-6 rounded-3xl overflow-hidden cursor-zoom-in bg-white/[0.02] border border-white/5 transition-all duration-700 hover:border-white/20 hover:shadow-2xl hover:shadow-blue-500/5 hover:-translate-y-1.5"
                             onClick={() => openLightbox(i)}>
-                            <div className="relative w-full" style={{ paddingBottom: `${h}%` }}>
+                            <div className="relative w-full overflow-hidden" style={{ paddingBottom: `${h}%` }}>
                                 <img src={cleanUrl(photo.url)} alt=""
-                                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+                                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-[1.08]"
                                     loading="lazy"
                                     onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.parentElement!.classList.add('bg-white/5'); }} />
+                                
+                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 flex items-center justify-center">
+                                    <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/10 scale-90 group-hover:scale-100 transition-all duration-700 shadow-2xl">
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white/80" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-400 flex flex-col justify-end p-4">
-                                {photo.title && <p className="text-white text-xs font-semibold translate-y-1 group-hover:translate-y-0 transition-transform duration-300">{photo.title}</p>}
+
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-700 flex flex-col justify-end p-6 pb-5">
+                                {photo.title && <p className="text-white text-[10px] font-black uppercase tracking-[0.2em] translate-y-2 group-hover:translate-y-0 transition-transform duration-700">{photo.title}</p>}
+                                <p className="text-white/40 text-[9px] font-bold uppercase tracking-widest mt-1 translate-y-3 group-hover:translate-y-0 transition-transform duration-700 delay-75">View Project</p>
                             </div>
+
                             {enableLikes && onLike && (
                                 <button onClick={(e) => { e.stopPropagation(); onLike(photo.id); }}
-                                    className={`absolute top-2.5 right-2.5 p-2 rounded-full backdrop-blur-md border transition-all duration-200 ${likedPhotos?.has(photo.id) ? "bg-rose-500 border-rose-400 text-white shadow-[0_0_12px_rgba(244,63,94,0.5)] scale-110" : "bg-black/30 border-white/10 text-white opacity-0 group-hover:opacity-100"}`}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={likedPhotos?.has(photo.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                                    className={`absolute top-5 right-5 p-3 rounded-full backdrop-blur-3xl border transition-all duration-500 ${likedPhotos?.has(photo.id) ? "bg-rose-500 border-rose-400 text-white shadow-[0_0_20px_rgba(244,63,94,0.5)] scale-115" : "bg-black/30 border-white/10 text-white opacity-0 group-hover:opacity-100 hover:scale-110"}`}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={likedPhotos?.has(photo.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5" className="w-4 h-4">
                                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                                     </svg>
                                 </button>
@@ -161,28 +119,31 @@ export default function PhotoGrid({ photos, enableLikes, onLike, likedPhotos }: 
                     );
                 })}
             </div>
+
             <LightboxPanel currentPhoto={currentPhoto} lightboxIndex={lightboxIndex} photos={photos}
                 imgLoaded={imgLoaded} setImgLoaded={setImgLoaded} closeLightbox={closeLightbox}
                 goNext={goNext} goPrev={goPrev} enableLikes={enableLikes} onLike={onLike}
-                likedPhotos={likedPhotos} setLightboxIndex={setLightboxIndex} />
+                likedPhotos={likedPhotos} setLightboxIndex={setLightboxIndex} downloadPhoto={downloadPhoto} />
+
+            <style>{`
+                .animate-fade-in { animation: fadeIn 0.8s ease-out forwards; }
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+            `}</style>
         </>
     );
 }
 
-function LightboxPanel({ currentPhoto, lightboxIndex, photos, imgLoaded, setImgLoaded, closeLightbox, goNext, goPrev, enableLikes, onLike, likedPhotos, setLightboxIndex }: any) {
+function LightboxPanel({ currentPhoto, lightboxIndex, photos, imgLoaded, setImgLoaded, closeLightbox, goNext, goPrev, enableLikes, onLike, likedPhotos, setLightboxIndex, downloadPhoto }: any) {
     const [touchStartX, setTouchStartX] = useState<number | null>(null);
     const [visible, setVisible] = useState(false);
     const [controlsVisible, setControlsVisible] = useState(true);
-    const [slideDir, setSlideDir] = useState<"left" | "right" | "none">("none");
 
-    // Fade-in on mount
     useEffect(() => {
         if (currentPhoto) {
             requestAnimationFrame(() => setVisible(true));
         }
     }, [currentPhoto]);
 
-    // Auto-hide controls after 3s of inactivity
     useEffect(() => {
         if (!currentPhoto) return;
         const timer = setTimeout(() => setControlsVisible(false), 3000);
@@ -193,29 +154,15 @@ function LightboxPanel({ currentPhoto, lightboxIndex, photos, imgLoaded, setImgL
         setControlsVisible(true);
     };
 
-    // Preload adjacent images
-    useEffect(() => {
-        if (lightboxIndex === null || photos.length <= 1) return;
-        const nextIdx = (lightboxIndex + 1) % photos.length;
-        const prevIdx = (lightboxIndex - 1 + photos.length) % photos.length;
-        [nextIdx, prevIdx].forEach(idx => {
-            const img = new Image();
-            img.src = cleanUrl(photos[idx].url);
-        });
-    }, [lightboxIndex, photos]);
-
-    const handleNext = () => { setSlideDir("left"); goNext(); };
-    const handlePrev = () => { setSlideDir("right"); goPrev(); };
+    const handleNext = () => goNext();
+    const handlePrev = () => goPrev();
 
     const handleClose = () => {
         setVisible(false);
-        setTimeout(closeLightbox, 250);
+        setTimeout(closeLightbox, 300);
     };
 
-    const handleTouchStart = (e: React.TouchEvent) => {
-        setTouchStartX(e.touches[0].clientX);
-    };
-
+    const handleTouchStart = (e: React.TouchEvent) => setTouchStartX(e.touches[0].clientX);
     const handleTouchEnd = (e: React.TouchEvent) => {
         if (touchStartX === null) return;
         const diff = touchStartX - e.changedTouches[0].clientX;
@@ -228,103 +175,96 @@ function LightboxPanel({ currentPhoto, lightboxIndex, photos, imgLoaded, setImgL
 
     if (!currentPhoto) return null;
 
-    const progress = photos.length > 1 ? ((lightboxIndex ?? 0) + 1) / photos.length * 100 : 100;
-
     return (
         <div
-            className="fixed inset-0 z-[100] overflow-y-auto overflow-x-hidden"
+            className="fixed inset-0 z-[200] flex flex-col overflow-hidden"
             style={{
-                background: visible ? "rgba(0,0,0,0.97)" : "rgba(0,0,0,0)",
-                backdropFilter: visible ? "blur(20px)" : "blur(0px)",
-                transition: "background 0.35s cubic-bezier(0.4,0,0.2,1), backdrop-filter 0.35s cubic-bezier(0.4,0,0.2,1)",
+                background: visible ? "rgba(4,4,4,0.99)" : "rgba(0,0,0,0)",
+                backdropFilter: visible ? "blur(40px)" : "blur(0px)",
+                transition: "background 0.5s cubic-bezier(0.4,0,0.2,1), backdrop-filter 0.5s cubic-bezier(0.4,0,0.2,1)",
             }}
             onClick={handleClose}
             onMouseMove={handleMouseMove}
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}>
 
-            {/* Progress bar */}
-            {photos.length > 1 && (
-                <div className="fixed top-0 left-0 right-0 h-[2px] z-[60] bg-white/5">
-                    <div className="h-full bg-white/40 transition-all duration-500 ease-out rounded-r-full" style={{ width: `${progress}%` }} />
+            {/* Top bar controls */}
+            <div className={`absolute top-0 left-0 right-0 flex items-center justify-between px-8 py-8 z-50 transition-all duration-700 ${controlsVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-8"}`}>
+                <div className="pointer-events-none">
+                    <p className="text-white text-[11px] font-black uppercase tracking-[0.4em] drop-shadow-2xl">{(lightboxIndex ?? 0) + 1} / {photos.length}</p>
+                    {currentPhoto.title && <p className="text-white/40 text-[10px] font-bold uppercase tracking-widest mt-1.5">{currentPhoto.title}</p>}
                 </div>
-            )}
-
-            {/* Top bar */}
-            <div className={`fixed top-0 left-0 right-0 flex items-center justify-between px-6 py-5 bg-gradient-to-b from-black/70 via-black/30 to-transparent z-50 pointer-events-none transition-all duration-500 ${controlsVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"}`}>
-                <div className="pointer-events-auto">
-                    {currentPhoto.title && <p className="text-white font-semibold text-sm drop-shadow-lg">{currentPhoto.title}</p>}
-                    <p className="text-white/40 text-xs mt-0.5 font-medium tracking-wide drop-shadow-lg">{(lightboxIndex ?? 0) + 1} of {photos.length}</p>
+                
+                <div className="flex items-center gap-4">
+                    <button onClick={(e) => { e.stopPropagation(); downloadPhoto(currentPhoto.url, currentPhoto.id); }}
+                        className="w-14 h-14 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/15 text-white/50 hover:text-white transition-all backdrop-blur-3xl border border-white/5 hover:scale-110 active:scale-95">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    </button>
+                    <button className="w-14 h-14 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/15 text-white/50 hover:text-white transition-all backdrop-blur-3xl border border-white/5 hover:rotate-90 hover:scale-110 active:scale-95" onClick={(e) => { e.stopPropagation(); handleClose(); }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
                 </div>
-                <button className="pointer-events-auto w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/25 text-white/60 hover:text-white transition-all duration-300 backdrop-blur-xl hover:rotate-90 hover:scale-110" onClick={(e) => { e.stopPropagation(); handleClose(); }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
             </div>
 
-            {/* Prev */}
+            {/* Navigation buttons */}
             {photos.length > 1 && (
-                <button className={`fixed left-3 sm:left-5 top-1/2 -translate-y-1/2 z-50 w-12 h-12 flex items-center justify-center rounded-full bg-white/8 hover:bg-white/20 text-white/50 hover:text-white transition-all duration-300 hover:scale-110 backdrop-blur-xl border border-white/5 hover:border-white/15 ${controlsVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"}`} onClick={(e) => { e.stopPropagation(); handlePrev(); }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                </button>
+                <>
+                    <button className={`absolute left-8 top-1/2 -translate-y-1/2 z-50 w-20 h-20 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/15 text-white/20 hover:text-white transition-all duration-500 hover:scale-110 active:scale-90 backdrop-blur-3xl border border-white/5 ${controlsVisible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-12"}`} onClick={(e) => { e.stopPropagation(); handlePrev(); }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <button className={`absolute right-8 top-1/2 -translate-y-1/2 z-50 w-20 h-20 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/15 text-white/20 hover:text-white transition-all duration-500 hover:scale-110 active:scale-90 backdrop-blur-3xl border border-white/5 ${controlsVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-12"}`} onClick={(e) => { e.stopPropagation(); handleNext(); }}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                </>
             )}
 
-            {/* Next */}
-            {photos.length > 1 && (
-                <button className={`fixed right-3 sm:right-5 top-1/2 -translate-y-1/2 z-50 w-12 h-12 flex items-center justify-center rounded-full bg-white/8 hover:bg-white/20 text-white/50 hover:text-white transition-all duration-300 hover:scale-110 backdrop-blur-xl border border-white/5 hover:border-white/15 ${controlsVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-4"}`} onClick={(e) => { e.stopPropagation(); handleNext(); }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                </button>
-            )}
+            {/* Main image */}
+            <div className="flex-1 flex items-center justify-center p-4 sm:p-24 relative select-none" onClick={(e) => e.stopPropagation()}>
+                {!imgLoaded && (
+                    <div className="flex flex-col items-center gap-6">
+                        <div className="w-14 h-14 border-2 border-white/5 border-t-white/40 rounded-full animate-spin"></div>
+                    </div>
+                )}
+                <img key={currentPhoto.id} src={cleanUrl(currentPhoto.url)} alt=""
+                    onLoad={() => setImgLoaded(true)}
+                    className="max-w-full max-h-full object-contain shadow-[0_0_100px_rgba(0,0,0,0.9)] z-10 transition-all duration-700 ease-in-out"
+                    style={{
+                        opacity: imgLoaded ? 1 : 0,
+                        transform: imgLoaded ? "scale(1)" : "scale(0.96)",
+                    }}
+                    draggable={false} />
+            </div>
 
-            {/* Bottom: thumbnails + like */}
-            <div className={`fixed bottom-0 left-0 right-0 flex items-center justify-between px-6 py-5 bg-gradient-to-t from-black/70 via-black/30 to-transparent z-50 pointer-events-none transition-all duration-500 ${controlsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"}`}>
+            {/* Bottom bar */}
+            <div className={`absolute bottom-0 left-0 right-0 flex flex-col gap-8 p-10 pb-16 transition-all duration-1000 ${controlsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"}`}>
+                <div className="flex items-center justify-between px-4">
+                    {enableLikes && onLike && (
+                        <button onClick={(e) => { e.stopPropagation(); onLike(currentPhoto.id); }}
+                            className={`flex items-center gap-4 px-10 py-5 rounded-[2.5rem] backdrop-blur-3xl border transition-all duration-700 hover:scale-105 active:scale-95 ${likedPhotos?.has(currentPhoto.id) ? "bg-rose-500 border-rose-400 text-white shadow-[0_0_50px_rgba(244,63,94,0.5)]" : "bg-white/5 border-white/10 text-white/70 hover:text-white hover:bg-white/10"}`}>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={likedPhotos?.has(currentPhoto.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-6 h-6">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                            </svg>
+                            <span className="text-[12px] font-black uppercase tracking-[0.3em]">{likedPhotos?.has(currentPhoto.id) ? "Favorited" : "Add to Favorites"}</span>
+                        </button>
+                    )}
+                    
+                    <button onClick={(e) => { e.stopPropagation(); downloadPhoto(currentPhoto.url, currentPhoto.id); }}
+                        className="text-[11px] font-black uppercase tracking-[0.4em] text-white/20 hover:text-emerald-400 transition-all duration-500 pb-1.5 border-b border-transparent hover:border-emerald-500/30">
+                        Download Original
+                    </button>
+                </div>
+
                 {photos.length > 1 && (
-                    <div className="flex gap-2 overflow-x-auto max-w-[65vw] pb-1 pointer-events-auto" style={{ scrollbarWidth: "none" }}>
-                        {photos.map((p: Photo, idx: number) => (
-                            <button key={p.id} onClick={(e) => { e.stopPropagation(); setSlideDir(idx > (lightboxIndex ?? 0) ? "left" : "right"); setLightboxIndex(idx); setImgLoaded(false); }}
-                                className={`shrink-0 w-12 h-12 rounded-lg overflow-hidden border-2 transition-all duration-300 hover:scale-105 ${idx === lightboxIndex ? "border-white scale-110 shadow-[0_0_12px_rgba(255,255,255,0.2)]" : "border-transparent opacity-30 hover:opacity-70"}`}>
+                    <div className="flex gap-3 overflow-x-auto justify-center pb-4 scrollbar-hide no-scrollbar" style={{ scrollbarWidth: "none" }}>
+                        {photos.map((p: any, idx: number) => (
+                            <button key={p.id} onClick={(e) => { e.stopPropagation(); setLightboxIndex(idx); setImgLoaded(false); }}
+                                className={`shrink-0 w-16 h-16 rounded-[1.25rem] overflow-hidden border-2 transition-all duration-700 ${idx === lightboxIndex ? "border-white scale-125 shadow-2xl z-10" : "border-transparent opacity-15 hover:opacity-100 hover:scale-110"}`}>
                                 <img src={cleanUrl(p.url)} alt="" className="w-full h-full object-cover" />
                             </button>
                         ))}
                     </div>
                 )}
-                {enableLikes && onLike && (
-                    <button onClick={(e) => { e.stopPropagation(); onLike(currentPhoto.id); }}
-                        className={`pointer-events-auto shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full backdrop-blur-xl border transition-all duration-300 hover:scale-105 ${likedPhotos?.has(currentPhoto.id) ? "bg-rose-500 border-rose-400 text-white shadow-[0_0_24px_rgba(244,63,94,0.4)]" : "bg-white/8 border-white/15 text-white hover:bg-white/15"}`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={likedPhotos?.has(currentPhoto.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-4 h-4">
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                        </svg>
-                        <span className="text-sm font-semibold">{likedPhotos?.has(currentPhoto.id) ? "Favorited" : "Favorite"}</span>
-                    </button>
-                )}
             </div>
-
-            {/* Main image container — scrollable for tall images, centered for short ones */}
-            <div className="min-h-screen w-full flex items-center justify-center px-4 sm:px-20 py-24" onClick={(e) => e.stopPropagation()}>
-                {!imgLoaded && (
-                    <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0">
-                        <div className="flex flex-col items-center gap-3">
-                            <div className="w-8 h-8 border-2 border-white/10 border-t-white/60 rounded-full animate-spin"></div>
-                            <p className="text-white/20 text-xs font-medium">Loading...</p>
-                        </div>
-                    </div>
-                )}
-                <img key={currentPhoto.id} src={cleanUrl(currentPhoto.url)} alt=""
-                    onLoad={() => { setImgLoaded(true); setSlideDir("none"); }}
-                    className="max-w-full h-auto object-contain sm:rounded-2xl shadow-2xl select-none z-10"
-                    style={{
-                        opacity: imgLoaded ? 1 : 0,
-                        maxWidth: 'min(100%, 1200px)',
-                        transform: imgLoaded
-                            ? "translateX(0) scale(1)"
-                            : `translateX(${slideDir === "left" ? "40px" : slideDir === "right" ? "-40px" : "0"}) scale(0.97)`,
-                        transition: "opacity 0.35s cubic-bezier(0.4,0,0.2,1), transform 0.4s cubic-bezier(0.22,1,0.36,1)",
-                    }}
-                    draggable={false} />
-            </div>
-
-            <style>{`
-                @keyframes lbIn { from { opacity:0; transform:scale(0.96); } to { opacity:1; transform:scale(1); } }
-            `}</style>
         </div>
     );
 }

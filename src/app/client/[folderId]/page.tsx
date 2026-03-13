@@ -16,24 +16,19 @@ interface GallerySettings {
     allowDownloads: boolean;
     addWatermark: boolean;
     language: string;
-    // Favorites
     allowSelection: boolean;
     favoritesName: string;
     limitSelected: boolean;
     allowComments: boolean;
-    // Privacy & Requirements
     requireEmail: boolean;
     requirePhone: boolean;
     requireInfo: boolean;
-    // Reviews
     allowReviews: boolean;
     reviewMessage: string;
     askReviewAfterDownload: boolean;
-    // Contacts
     showShareButton: boolean;
     showBusinessCard: boolean;
     showNameOnCover: boolean;
-    // Privacy
     protectWithPassword: boolean;
     password: string;
     allowGuestAccess: boolean;
@@ -60,27 +55,31 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
     const [likedPhotos, setLikedPhotos] = useState<Set<string>>(new Set());
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState("");
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [isExploring, setIsExploring] = useState(false);
 
     const [coverColor, setCoverColor] = useState("#0f0f0f");
     const [coverAccent, setCoverAccent] = useState("#e11d48");
+    const [settingsSaved, setSettingsSaved] = useState(false);
+    const [linkCopied, setLinkCopied] = useState(false);
 
     const [settings, setSettings] = useState<GallerySettings>({
         galleryName: "",
         shootDate: "",
-        storeUntil: "2026-03-31",
+        storeUntil: "2026-12-31",
         galleryType: "client",
         allowDownloads: true,
         addWatermark: false,
         language: "English (default)",
         allowSelection: true,
-        favoritesName: "Selecting photos",
+        favoritesName: "Selection",
         limitSelected: false,
         allowComments: false,
         requireEmail: true,
         requirePhone: false,
         requireInfo: false,
         allowReviews: true,
-        reviewMessage: "Please write your review",
+        reviewMessage: "Would you like to leave a review?",
         askReviewAfterDownload: true,
         showShareButton: true,
         showBusinessCard: true,
@@ -89,84 +88,47 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
         password: "",
         allowGuestAccess: false,
     });
-    const [settingsSaved, setSettingsSaved] = useState(false);
 
-    const [isDragging, setIsDragging] = useState(false);
     const [uploadFiles, setUploadFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadSuccess, setUploadSuccess] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const galleryLink = `http://localhost:3000/client/${folderId}`;
-
     const fetchDrive = useCallback(() => {
         fetch(`/api/drive/client/${folderId}`)
             .then(res => { if (!res.ok) throw new Error(); return res.json(); })
             .then(data => {
-                const name = data.clientName || "Your Gallery";
-                setClientName(name);
+                setClientName(data.clientName || "Your Gallery");
                 setImages(data.images || []);
                 setVideos(data.videos || []);
                 setLikedPhotos(new Set(data.favorites || []));
                 setCoverColor(data.coverColor || "#0f0f0f");
                 setCoverAccent(data.coverAccent || "#e11d48");
-                setSettings({
-                    galleryName: name,
-                    shootDate: data.shootDate || "",
-                    storeUntil: data.storeUntil || "2026-03-31",
-                    galleryType: data.galleryType || "client",
-                    allowDownloads: data.allowDownloads !== undefined ? data.allowDownloads : true,
-                    addWatermark: data.addWatermark || false,
-                    language: data.language || "English (default)",
-                    allowSelection: data.allowSelection !== undefined ? data.allowSelection : true,
-                    favoritesName: data.favoritesName || "Selecting photos",
-                    limitSelected: data.limitSelected || false,
-                    allowComments: data.allowComments || false,
-                    requireEmail: data.requireEmail !== undefined ? data.requireEmail : true,
-                    requirePhone: data.requirePhone || false,
-                    requireInfo: data.requireInfo || false,
-                    allowReviews: data.allowReviews !== undefined ? data.allowReviews : true,
-                    reviewMessage: data.reviewMessage || "Please write your review",
-                    askReviewAfterDownload: data.askReviewAfterDownload !== undefined ? data.askReviewAfterDownload : true,
-                    showShareButton: data.showShareButton !== undefined ? data.showShareButton : true,
-                    showBusinessCard: data.showBusinessCard !== undefined ? data.showBusinessCard : true,
-                    showNameOnCover: data.showNameOnCover !== undefined ? data.showNameOnCover : true,
-                    protectWithPassword: data.protectWithPassword || false,
-                    password: data.password || "",
-                    allowGuestAccess: data.allowGuestAccess || false,
-                });
+                setSettings(prev => ({ ...prev, ...data, galleryName: data.clientName || prev.galleryName }));
                 setIsLoading(false);
             })
-            .catch(() => { setError("Failed to load gallery."); setIsLoading(false); });
+            .catch(() => { setError("Gallery not found."); setIsLoading(false); });
     }, [folderId]);
 
-    useEffect(() => { fetchDrive(); }, [fetchDrive]);
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const token = localStorage.getItem("token");
+            if (token) setIsAdmin(true);
+        }
+        fetchDrive();
+    }, [fetchDrive]);
 
     const handleLike = async (id: string) => {
         const nextLiked = new Set(likedPhotos);
         nextLiked.has(id) ? nextLiked.delete(id) : nextLiked.add(id);
-
-        // Optimistic UI update
         setLikedPhotos(nextLiked);
-
-        // Sync with backend
         try {
             await fetch(`/api/drives/${folderId}/settings`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ favorites: Array.from(nextLiked) })
             });
-        } catch (e) {
-            console.error("Failed to sync favorites:", e);
-        }
-    };
-
-    const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
-    const onDragLeave = () => setIsDragging(false);
-    const onDrop = (e: React.DragEvent) => {
-        e.preventDefault(); setIsDragging(false);
-        const dropped = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/") || f.type.startsWith("video/"));
-        setUploadFiles(prev => [...prev, ...dropped]);
+        } catch (e) { console.error("Sync failed", e); }
     };
 
     const handleUpload = async () => {
@@ -176,10 +138,8 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
             const formData = new FormData();
             uploadFiles.forEach(f => formData.append("files", f));
             const res = await fetch(`/api/drives/${folderId}/upload`, { method: "PATCH", body: formData });
-            if (!res.ok) throw new Error();
-            setUploadFiles([]); setUploadSuccess(true); fetchDrive();
-            setTimeout(() => setUploadSuccess(false), 3000);
-        } catch { alert("Upload failed."); }
+            if (res.ok) { setUploadFiles([]); setUploadSuccess(true); fetchDrive(); setTimeout(() => setUploadSuccess(false), 3000); }
+        } catch { alert("Upload error"); }
         finally { setIsUploading(false); }
     };
 
@@ -188,509 +148,353 @@ export default function ClientDrivePage({ params }: { params: Promise<{ folderId
             const res = await fetch(`/api/drives/${folderId}/settings`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    clientName: settings.galleryName,
-                    ...settings,
-                    coverColor,
-                    coverAccent
-                })
+                body: JSON.stringify({ ...settings, clientName: settings.galleryName, coverColor, coverAccent })
             });
-            if (!res.ok) throw new Error();
-            setClientName(settings.galleryName || clientName);
-            setSettingsSaved(true);
-            setTimeout(() => setSettingsSaved(false), 2500);
-        } catch (e) {
-            alert("Failed to save settings.");
-        }
+            if (res.ok) { setSettingsSaved(true); setTimeout(() => setSettingsSaved(false), 2000); }
+        } catch { alert("Save failed"); }
     };
 
-    const handleDeleteGallery = async () => {
-        if (!confirm("Delete this gallery? This cannot be undone.")) return;
-
-        try {
-            const res = await fetch(`/api/drives/${folderId}`, {
-                method: "DELETE"
-            });
-
-            if (res.ok) {
-                alert("Gallery deleted successfully.");
-                router.push("/admin");
-            } else {
-                const data = await res.json();
-                alert(`Failed to delete gallery: ${data.error || "Unknown error"}`);
-            }
-        } catch (error) {
-            console.error("Delete error:", error);
-            alert("An error occurred while deleting the gallery.");
-        }
+    const handleCopy = () => {
+        navigator.clipboard.writeText(window.location.href);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
     };
-
-    const favoritePhotos = images.filter(p => likedPhotos.has(p.id));
 
     if (error) return (
-        <div className="flex-1 flex items-center justify-center min-h-[50vh] px-6">
-            <div className="text-center max-w-md">
-                <p className="text-5xl mb-4">🔒</p>
-                <h2 className="text-2xl font-bold mb-2">Gallery Not Found</h2>
-                <p className="text-muted-foreground mb-6">This gallery link is invalid or has expired.</p>
-                <Link href="/client" className="underline text-sm">← Back to all galleries</Link>
+        <div className="min-h-screen bg-black flex items-center justify-center p-8">
+            <div className="text-center animate-fade-in">
+                <div className="w-24 h-24 rounded-[3rem] bg-white/5 flex items-center justify-center mx-auto mb-8 text-6xl shadow-2xl">🔒</div>
+                <h1 className="text-3xl font-black tracking-tighter text-white mb-3">Access Restricted</h1>
+                <p className="text-white/30 text-sm mb-10 max-w-xs mx-auto">This gallery is either private, expired, or the link is incorrect.</p>
+                <Link href="/" className="text-[11px] font-black uppercase tracking-[0.4em] text-blue-400 hover:text-white transition-all underline underline-offset-8">Return Home</Link>
             </div>
         </div>
     );
 
     if (isLoading) return (
-        <div className="flex-1 flex items-center justify-center min-h-[50vh]">
-            <div className="text-center">
-                <div className="w-8 h-8 border-2 border-foreground border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-muted-foreground text-sm">Loading secure drive...</p>
+        <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+            <div className="text-center animate-pulse">
+                <div className="w-16 h-16 border-2 border-white/5 border-t-white/40 rounded-full animate-spin mx-auto mb-6"></div>
+                <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.5em]">Loading Visuals</p>
             </div>
         </div>
     );
 
-    const navTabs: { id: Section; label: string; icon: React.ReactNode; badge?: number }[] = [
-        { id: "gallery", label: "Gallery", icon: <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> },
-        { id: "favorites", label: "Favorites", badge: likedPhotos.size || undefined, icon: <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill={likedPhotos.size > 0 ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg> },
-        { id: "settings", label: "Settings", icon: <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg> },
-        { id: "design", label: "Design and cover", icon: <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" /></svg> },
-    ];
-
-    const settingsTabList: SettingsTab[] = ["Main", "Favorites", "Products", "Reviews", "Contacts", "Privacy"];
+    const coverImg = images[0]?.url;
 
     return (
-        <div className="min-h-screen bg-premium-gradient text-white font-sans overflow-y-auto custom-scrollbar flex flex-col">
-            {/* Sticky Header */}
-            <div className="border-b border-white/5 bg-black/40 backdrop-blur-2xl sticky top-0 z-40 transition-all duration-500">
-                <div className="container mx-auto px-10 pt-8">
-                    <Link href="/admin" className="inline-flex items-center gap-2 text-[10px] font-black text-white/30 hover:text-white transition-all mb-4 group tracking-widest uppercase">
-                        <div className="p-1 rounded-lg bg-white/5 group-hover:bg-white/10 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+        <div className="min-h-screen bg-[#050505] text-white selection:bg-blue-500/30">
+            
+            {/* ── CINEMATIC ENTRANCE HERO ── */}
+            {!isExploring && (
+                <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center overflow-hidden animate-fade-in">
+                    {coverImg && (
+                        <div className="absolute inset-0 opacity-40">
+                            <img src={coverImg} alt="" className="w-full h-full object-cover scale-[1.05] blur-[2px]" />
                         </div>
-                        Back to Dashboard
-                    </Link>
-                    <div className="flex items-center justify-between mb-8">
-                        <div>
-                            <h1 className="text-4xl font-black tracking-tighter text-gradient">{clientName}</h1>
-                            <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.3em] mt-1.5 flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-                                Secure Client Sanctuary · {images.length + videos.length} Media Assets
-                            </p>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+                    
+                    <div className="relative z-10 text-center px-8">
+                        <div className="flex items-center justify-center gap-3 mb-8 animate-fade-in delay-100">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)] animate-pulse"></span>
+                            <span className="text-emerald-400/80 text-[10px] font-black uppercase tracking-[0.5em]">Private Invitation</span>
                         </div>
-                        <div className="flex gap-4">
-                            <button onClick={() => window.open(galleryLink, '_blank')} className="px-6 py-3 rounded-2xl bg-white/5 border border-white/5 text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-2 group">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 01-2 2h14a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                                LIVE PREVIEW
+                        <h1 className="text-7xl md:text-9xl font-black tracking-tighter text-white mb-8 border-b border-white/5 pb-12 leading-[0.85] animate-fade-in delay-200">
+                            {clientName}
+                        </h1>
+                        <div className="flex flex-col items-center gap-10 animate-fade-in delay-300">
+                            <button 
+                                onClick={() => setIsExploring(true)}
+                                className="group relative px-14 py-6 rounded-full overflow-hidden transition-all duration-700 hover:scale-110 active:scale-95 shadow-2xl shadow-white/5"
+                            >
+                                <div className="absolute inset-0 bg-white group-hover:bg-blue-600 transition-colors duration-700"></div>
+                                <span className="relative z-10 text-black group-hover:text-white text-[12px] font-black uppercase tracking-[0.4em]">Explore Gallery</span>
                             </button>
-                            <button onClick={handleSaveSettings} className="px-6 py-3 rounded-2xl bg-blue-600 text-white text-xs font-black hover:bg-blue-500 transition-all accent-glow active:scale-95">
-                                {settingsSaved ? "CHANGES SAVED" : "SAVE CONFIGURATION"}
-                            </button>
+                            <p className="text-white/20 text-[10px] font-bold uppercase tracking-[0.3em]">Curated by {clientName.split(' ')[0]}</p>
                         </div>
                     </div>
-                    <nav className="flex gap-4 overflow-x-auto scrollbar-none border-t border-white/5">
-                        {navTabs.map(tab => (
-                            <button key={tab.id} onClick={() => setSection(tab.id)}
-                                className={`flex items-center gap-2.5 px-6 py-5 text-[11px] font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${section === tab.id ? "border-blue-500 text-white" : "border-transparent text-white/20 hover:text-white/40"}`}>
-                                {tab.icon}
-                                {tab.label}
-                                {tab.badge !== undefined && <span className="ml-1 bg-white/10 text-white text-[10px] rounded-lg px-2 py-0.5 leading-none">{tab.badge}</span>}
-                            </button>
-                        ))}
-                    </nav>
+                    
+                    {/* Bottom stats blur */}
+                    <div className="absolute bottom-12 left-0 right-0 px-12 flex justify-between items-end opacity-20 pointer-events-none">
+                        <div className="flex flex-col gap-1">
+                            <span className="text-[9px] font-black uppercase tracking-widest leading-none">Total Assets</span>
+                            <span className="text-5xl font-black tracking-tighter">{images.length + videos.length}</span>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-[9px] font-black uppercase tracking-widest leading-none">Studio Quality</span>
+                            <p className="text-xs font-bold mt-1 uppercase tracking-widest underline decoration-white/20">Ready for Download</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
 
-            {/* Content */}
-            <div className="container mx-auto px-6 py-8 flex-1">
-
-                {/* ── GALLERY ── */}
-                {section === "gallery" && (
-                    <div className="slide-up">
-                        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-                            <div className="inline-flex glass-dark p-1.5 rounded-2xl border border-white/5">
-                                <button onClick={() => setMediaTab("images")} className={`px-8 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${mediaTab === "images" ? "bg-white text-black shadow-xl" : "text-white/30 hover:text-white"}`}>Photos · {images.length}</button>
-                                <button onClick={() => setMediaTab("videos")} className={`px-8 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${mediaTab === "videos" ? "bg-white text-black shadow-xl" : "text-white/30 hover:text-white"}`}>Videos · {videos.length}</button>
-                            </div>
-                            <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.2em] hidden sm:block">Click assets for immersive view · Heart to curate favorites</p>
-                        </div>
-
-                        {/* Drop Zone */}
-                        <div onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} onClick={() => fileInputRef.current?.click()}
-                            className={`mb-10 flex flex-col items-center justify-center w-full h-40 border-2 border-dashed rounded-[2.5rem] cursor-pointer transition-all duration-500 relative group/drop overflow-hidden ${isDragging ? "border-blue-500 bg-blue-500/5 scale-[1.005]" : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/20"}`}>
-                            <div className="absolute inset-0 bg-blue-500/0 group-hover/drop:bg-blue-500/[0.02] transition-colors" />
-                            <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center mb-3 group-hover/drop:scale-110 group-hover/drop:bg-blue-500/10 transition-all duration-500 relative z-10">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-white/20 group-hover/drop:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
-                            </div>
-                            <p className="text-sm font-bold text-white/40 relative z-10">Select files or <span className="text-white">drag & drop</span></p>
-                            <input ref={fileInputRef} type="file" multiple accept="image/*,video/*" className="hidden" onChange={e => { if (e.target.files) setUploadFiles(prev => [...prev, ...Array.from(e.target.files!)]); }} />
-                        </div>
-
-                        {uploadFiles.length > 0 && (
-                            <div className="mb-6 p-4 rounded-2xl border border-muted bg-muted/20">
-                                <div className="flex items-center justify-between mb-3">
-                                    <p className="text-sm font-semibold">{uploadFiles.length} file(s) ready</p>
-                                    <button onClick={handleUpload} disabled={isUploading} className="px-4 py-2 rounded-full bg-foreground text-background text-xs font-semibold hover:opacity-90 disabled:opacity-50 flex items-center gap-2">
-                                        {isUploading ? <><div className="w-3 h-3 border border-background border-t-transparent rounded-full animate-spin" />Uploading...</> : "Upload All"}
-                                    </button>
-                                </div>
-                                <div className="flex gap-2 flex-wrap">
-                                    {uploadFiles.map((f, i) => (
-                                        <span key={i} className="flex items-center gap-1.5 text-xs bg-background border border-muted px-3 py-1.5 rounded-full">
-                                            {f.type.startsWith("image/") ? "🖼️" : "🎬"} <span className="max-w-[120px] truncate">{f.name}</span>
-                                            <button onClick={() => setUploadFiles(prev => prev.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-foreground ml-1">✕</button>
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {uploadSuccess && <div className="mb-6 p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-600 text-sm text-center">✓ Files uploaded successfully!</div>}
-
-                        {mediaTab === "images" ? (
-                            <PhotoGrid photos={images} enableLikes onLike={handleLike} likedPhotos={likedPhotos} />
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {videos.length === 0 ? <p className="col-span-3 text-center py-20 text-muted-foreground">No videos yet.</p> : videos.map(vid => (
-                                    <div key={vid.id} className="group flex flex-col gap-2">
-                                        <div className="relative aspect-video rounded-2xl overflow-hidden bg-black border border-muted">
-                                            <video src={vid.url} controls className="w-full h-full object-cover" />
-                                            <button onClick={() => handleLike(vid.id)} className={`absolute top-3 right-3 p-2 rounded-full border transition-all ${likedPhotos.has(vid.id) ? "bg-rose-500 border-rose-500 text-white" : "bg-black/30 border-white/10 text-white opacity-0 group-hover:opacity-100"}`}>
-                                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={likedPhotos.has(vid.id) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" /></svg>
-                                            </button>
-                                        </div>
-                                        <p className="text-sm font-medium truncate px-1">{vid.title}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* ── FAVORITES ── */}
-                {section === "favorites" && (
-                    <div className="slide-up">
-                        <div className="flex items-center justify-between mb-10">
-                            <div>
-                                <h2 className="text-2xl font-black tracking-tight">Curated Favorites</h2>
-                                <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mt-1">{likedPhotos.size} items have been chosen</p>
-                            </div>
-                            {likedPhotos.size > 0 && (
-                                <button onClick={() => alert(`Downloading ${likedPhotos.size} favorites...`)} className="px-6 py-3 rounded-2xl bg-white text-black text-xs font-black hover:bg-white/90 transition-all flex items-center gap-2 shadow-xl active:scale-95">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                    DOWNLOAD ALL
+            {/* ── MAIN CONTENT ── */}
+            <div className={`relative transition-all duration-1000 ${isExploring ? "opacity-100" : "opacity-0 translate-y-20 scale-110 pointer-events-none"}`}>
+                
+                {/* Immersive Cover Header */}
+                <header className="relative h-[85vh] flex items-end overflow-hidden">
+                    {coverImg && <img src={coverImg} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+                    <div 
+                        className="absolute inset-0 shadow-inner" 
+                        style={{ background: `linear-gradient(to top, #050505 0%, transparent 60%), linear-gradient(to right, #050505cc 0%, transparent 40%)` }}
+                    ></div>
+                    
+                    {/* Top Admin Tools (Hidden from clients) */}
+                    <div className="absolute top-0 left-0 right-0 p-8 flex justify-between items-center z-50">
+                        <Link href={isAdmin ? "/admin" : "/"} className="flex items-center gap-3 px-6 py-3 rounded-full bg-white/5 backdrop-blur-3xl border border-white/8 hover:bg-white/10 transition-all text-[10px] font-black uppercase tracking-[0.2em]">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                            {isAdmin ? "Admin Dashboard" : "Main Site"}
+                        </Link>
+                        
+                        <div className="flex items-center gap-3">
+                            <button onClick={handleCopy} className="p-4 rounded-full bg-white/5 backdrop-blur-3xl border border-white/8 hover:bg-white/10 transition-all">
+                                {linkCopied ? <span className="text-[10px] font-black uppercase text-emerald-400">Copied!</span> : <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>}
+                            </button>
+                            {isAdmin && (
+                                <button onClick={handleSaveSettings} className="px-8 py-3 rounded-full bg-blue-600 hover:bg-blue-500 transition-all text-[10px] font-black uppercase tracking-[0.4em] shadow-2xl shadow-blue-500/20">
+                                    {settingsSaved ? "Saved ✓" : "Commit Changes"}
                                 </button>
                             )}
                         </div>
-                        {likedPhotos.size === 0 ? (
-                            <div className="glass-dark border border-white/5 rounded-[3rem] py-32 text-center">
-                                <div className="w-20 h-20 bg-white/5 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
-                                    <p className="text-4xl text-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.3)]">🤍</p>
-                                </div>
-                                <h3 className="text-lg font-bold mb-2">No favorites captured yet</h3>
-                                <p className="text-white/30 text-xs font-medium mb-8">Heart photos in the main gallery to curate your collection.</p>
-                                <button onClick={() => setSection("gallery")} className="text-xs font-black text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-widest">Explore Gallery →</button>
-                            </div>
-                        ) : <PhotoGrid photos={favoritePhotos} enableLikes onLike={handleLike} likedPhotos={likedPhotos} />}
                     </div>
-                )}
 
-                {/* ── SETTINGS ── */}
-                {section === "settings" && (
-                    <div className="max-w-3xl slide-up">
-                        <p className="text-[11px] font-bold text-white/30 uppercase tracking-[0.2em] mb-10">Advanced Gallery Orchestration</p>
+                    <div className="relative z-10 p-12 w-full max-w-6xl animate-fade-in">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-3xl border border-white/10 text-[9px] font-black uppercase tracking-[0.3em]">{settings.galleryType} Edition</div>
+                            {settings.shootDate && <span className="text-white/30 text-[10px] font-bold uppercase tracking-widest">{new Date(settings.shootDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>}
+                        </div>
+                        <h1 className="text-6xl md:text-8xl font-black tracking-tighter text-white mb-6 uppercase leading-none">{clientName}</h1>
+                        <p className="text-white/40 text-sm font-medium tracking-wide max-w-xl leading-relaxed">
+                            A curated legacy of moments, captured and preserved with intent. Authenticity in every frame, depth in every shadow.
+                        </p>
+                    </div>
+                </header>
 
-                        {/* Settings sub-tabs */}
-                        <div className="flex gap-2 border-b border-white/5 mb-10 overflow-x-auto scrollbar-none">
-                            {settingsTabList.map(tab => (
-                                <button key={tab} onClick={() => setSettingsTab(tab)}
-                                    className={`px-6 py-4 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all whitespace-nowrap ${settingsTab === tab ? "border-blue-500 text-white" : "border-transparent text-white/20 hover:text-white"}`}>
-                                    {tab}
+                {/* ── NAVIGATION ── */}
+                <nav className="sticky top-0 z-[60] bg-[#050505]/80 backdrop-blur-3xl border-b border-white/5">
+                    <div className="max-w-7xl mx-auto px-10 flex items-center justify-between h-20">
+                        <div className="flex items-center gap-1">
+                            {([
+                                { id: "gallery", label: "Collection", count: images.length + videos.length },
+                                { id: "favorites", label: "My Favorites", count: likedPhotos.size },
+                                ...(isAdmin ? [
+                                    { id: "settings", label: "Management" },
+                                    { id: "design", label: "Atmosphere" },
+                                ] : [])
+                            ] as { id: Section; label: string; count?: number }[]).map(tab => (
+                                <button 
+                                    key={tab.id}
+                                    onClick={() => setSection(tab.id)}
+                                    className={`relative group px-6 py-4 transition-all duration-300`}
+                                >
+                                    <span className={`text-[11px] font-black uppercase tracking-[0.3em] transition-colors ${section === tab.id ? "text-white" : "text-white/25 group-hover:text-white/60"}`}>
+                                        {tab.label}
+                                    </span>
+                                    {tab.count !== undefined && tab.count > 0 && (
+                                        <span className={`ml-2 text-[9px] px-1.5 py-0.5 rounded-[0.5rem] font-black ${section === tab.id ? "bg-white text-black" : "bg-white/10 text-white/40"}`}>
+                                            {tab.count}
+                                        </span>
+                                    )}
+                                    {section === tab.id && <div className="absolute bottom-0 left-6 right-6 h-[2px] bg-white rounded-t-full shadow-[0_0_12px_rgba(255,255,255,0.4)]"></div>}
                                 </button>
                             ))}
                         </div>
-
-                        {/* Main */}
-                        {settingsTab === "Main" && (
-                            <div className="space-y-10 animate-fade-in">
-                                <div>
-                                    <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-4 ml-1">Gallery Identity</label>
-                                    <input type="text" value={settings.galleryName} onChange={e => setSettings(s => ({ ...s, galleryName: e.target.value }))} className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-6 py-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-white/20 transition-all placeholder:text-white/10" placeholder="e.g. Masterpiece Wedding 2024" />
+                        
+                        <div className="flex items-center gap-6">
+                            {section === "gallery" && (
+                                <div className="flex bg-white/5 rounded-full p-1 border border-white/8">
+                                    <button onClick={() => setMediaTab("images")} className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${mediaTab === "images" ? "bg-white text-black" : "text-white/30 hover:text-white"}`}>Visuals</button>
+                                    <button onClick={() => setMediaTab("videos")} className={`px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${mediaTab === "videos" ? "bg-white text-black" : "text-white/30 hover:text-white"}`}>Reels</button>
                                 </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-4 ml-1">Access Channel</label>
-                                    <div className="flex items-center border border-white/5 rounded-2xl overflow-hidden bg-white/[0.02] group">
-                                        <span className="text-[10px] font-black text-white/20 px-6 py-4 border-r border-white/5 shrink-0 bg-white/[0.01]">LENSDRIVE.COM/CL/</span>
-                                        <span className="text-sm font-mono flex-1 px-6 truncate font-bold">{folderId}</span>
-                                        <button onClick={() => navigator.clipboard.writeText(galleryLink)} className="shrink-0 px-6 py-4 text-[10px] font-black text-blue-400 hover:text-white hover:bg-blue-600 transition-all border-l border-white/5 uppercase tracking-widest">Copy Link</button>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-4 ml-1">Production Date</label>
-                                        <input type="date" value={settings.shootDate} onChange={e => setSettings(s => ({ ...s, shootDate: e.target.value }))} className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-6 py-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-white/20 transition-all text-white inverted-scheme" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-4 ml-1">Persistence Until</label>
-                                        <div className="relative">
-                                            <input type="date" value={settings.storeUntil} onChange={e => setSettings(s => ({ ...s, storeUntil: e.target.value }))} className="w-full bg-white/[0.03] border border-white/5 rounded-2xl px-6 py-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-white/20 transition-all text-white inverted-scheme" />
-                                            {settings.storeUntil && <button onClick={() => setSettings(s => ({ ...s, storeUntil: "" }))} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white text-xs shrink-0">✕</button>}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-4 ml-1">Environment Classification</label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <button onClick={() => setSettings(s => ({ ...s, galleryType: "client" }))} className={`flex items-center gap-4 px-6 py-4 rounded-2xl border transition-all ${settings.galleryType === "client" ? "border-blue-500 bg-blue-500/10 shadow-[0_0_20px_rgba(59,130,246,0.1)]" : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04]"}`}>
-                                            <div className={`p-2 rounded-lg ${settings.galleryType === "client" ? "bg-blue-500 text-white" : "bg-white/5 text-white/30"}`}>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><rect x="3" y="3" width="18" height="18" rx="2" /><path strokeLinecap="round" strokeLinejoin="round" d="M3 9h18" /></svg>
-                                            </div>
-                                            <div className="text-left">
-                                                <p className="text-xs font-black">Private Sanctuary</p>
-                                                <p className="text-[10px] text-white/20 font-bold uppercase tracking-tighter">Client delivery focused</p>
-                                            </div>
-                                        </button>
-                                        <button onClick={() => setSettings(s => ({ ...s, galleryType: "sales" }))} className={`flex items-center gap-4 px-6 py-4 rounded-2xl border transition-all ${settings.galleryType === "sales" ? "border-purple-500 bg-purple-500/10 shadow-[0_0_20px_rgba(168,85,247,0.1)]" : "border-white/5 bg-white/[0.02] hover:bg-white/[0.04]"}`}>
-                                            <div className={`p-2 rounded-lg ${settings.galleryType === "sales" ? "bg-purple-500 text-white" : "bg-white/5 text-white/30"}`}>
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-1.5 6M17 13l1.5 6M9 19h6" /></svg>
-                                            </div>
-                                            <div className="text-left">
-                                                <p className="text-xs font-black">Commercial Suite</p>
-                                                <p className="text-[10px] text-white/20 font-bold uppercase tracking-tighter">Sales and licenses enabled</p>
-                                            </div>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="glass-dark border border-white/5 rounded-3xl divide-y divide-white/5 overflow-hidden">
-                                    <div className="flex items-center justify-between px-8 py-6">
-                                        <div>
-                                            <p className="text-xs font-black">Unrestricted Asset Extraction</p>
-                                            <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest mt-0.5">Allow original high-res downloads</p>
-                                        </div>
-                                        <Toggle checked={settings.allowDownloads} onChange={v => setSettings(s => ({ ...s, allowDownloads: v, addWatermark: v ? false : s.addWatermark }))} />
-                                    </div>
-                                    <div className={`flex items-center justify-between px-8 py-6 transition-opacity duration-500 ${settings.allowDownloads ? "opacity-20 pointer-events-none" : ""}`}>
-                                        <div>
-                                            <p className="text-xs font-black">Visual Metadata (Watermark)</p>
-                                            <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest mt-0.5">Protect assets during preview phases</p>
-                                        </div>
-                                        <Toggle checked={settings.addWatermark} disabled={settings.allowDownloads} onChange={v => setSettings(s => ({ ...s, addWatermark: v }))} aria-hidden={settings.allowDownloads} />
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Favorites */}
-                        {settingsTab === "Favorites" && (
-                            <div className="space-y-4">
-                                <div className="rounded-xl border border-muted p-4 flex items-center justify-between">
-                                    <p className="text-sm font-medium">Allow photo selection</p>
-                                    <Toggle checked={settings.allowSelection} onChange={v => setSettings(s => ({ ...s, allowSelection: v }))} />
-                                </div>
-                                <p className="text-xs text-muted-foreground px-1">Clients can add files to Favorites to select photos for retouching, printing, and more.</p>
-                                <div className="rounded-xl border border-muted divide-y divide-muted/50 overflow-hidden">
-                                    <div className="p-4">
-                                        <p className="text-sm font-semibold mb-3">Favorites name</p>
-                                        <input type="text" value={settings.favoritesName} onChange={e => setSettings(s => ({ ...s, favoritesName: e.target.value }))} className="w-full px-4 py-2.5 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground text-sm" />
-                                        <p className="text-xs text-muted-foreground mt-2">Clients will see this name when they create Favorites.</p>
-                                    </div>
-                                    <div className="flex items-center justify-between px-4 py-4"><p className="text-sm font-medium">Limit selected photos</p><Toggle checked={settings.limitSelected} onChange={v => setSettings(s => ({ ...s, limitSelected: v }))} /></div>
-                                    <div className="flex items-center justify-between px-4 py-4"><p className="text-sm font-medium">Allow comments</p><Toggle checked={settings.allowComments} onChange={v => setSettings(s => ({ ...s, allowComments: v }))} /></div>
-                                </div>
-                                <div className="rounded-xl border border-muted divide-y divide-muted/50 overflow-hidden">
-                                    <div className="flex items-center justify-between px-4 py-4">
-                                        <div>
-                                            <p className="text-sm font-medium">Client name</p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">Name format is set in the <span className="text-foreground underline cursor-pointer">Drive settings</span>.</p>
-                                        </div>
-                                        <span className="flex items-center gap-1 text-xs text-muted-foreground shrink-0 ml-4">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>Required
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between px-4 py-4">
-                                        <div><p className="text-sm font-medium">Require email</p><p className="text-xs text-muted-foreground mt-0.5">Clients will receive an email with a link to their Favorites.</p></div>
-                                        <Toggle checked={settings.requireEmail} onChange={v => setSettings(s => ({ ...s, requireEmail: v }))} />
-                                    </div>
-                                    <div className="flex items-center justify-between px-4 py-4"><p className="text-sm font-medium">Require phone number</p><Toggle checked={settings.requirePhone} onChange={v => setSettings(s => ({ ...s, requirePhone: v }))} /></div>
-                                    <div className="flex items-center justify-between px-4 py-4"><p className="text-sm font-medium">Require additional info</p><Toggle checked={settings.requireInfo} onChange={v => setSettings(s => ({ ...s, requireInfo: v }))} /></div>
-                                </div>
-                                <p className="text-xs text-muted-foreground px-1">Client name is required. Enable extra fields if you need more details from the client.</p>
-                            </div>
-                        )}
-
-                        {/* Products */}
-                        {settingsTab === "Products" && <div className="text-center py-16"><p className="text-4xl mb-3">🛒</p><h3 className="font-semibold mb-2">Products</h3><p className="text-sm text-muted-foreground">Set up print products, packages, and digital downloads for sale here.</p></div>}
-
-                        {/* Reviews */}
-                        {settingsTab === "Reviews" && (
-                            <div className="space-y-4">
-                                <div className="rounded-xl border border-muted p-4 flex items-center justify-between">
-                                    <p className="text-sm font-medium">Allow reviews</p>
-                                    <Toggle checked={settings.allowReviews} onChange={v => setSettings(s => ({ ...s, allowReviews: v }))} />
-                                </div>
-                                <div className="rounded-xl border border-muted p-4">
-                                    <label className="block text-sm font-semibold mb-2">Review message</label>
-                                    <textarea
-                                        value={settings.reviewMessage}
-                                        onChange={e => setSettings(s => ({ ...s, reviewMessage: e.target.value }))}
-                                        className="w-full h-24 px-4 py-3 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground text-sm resize-none"
-                                    />
-                                    <p className="text-xs text-muted-foreground mt-2">Ask for specific and meaningful feedback.</p>
-                                </div>
-                                <div className="rounded-xl border border-muted p-4 flex items-center justify-between">
-                                    <p className="text-sm font-medium">Ask for a review after download</p>
-                                    <Toggle checked={settings.askReviewAfterDownload} onChange={v => setSettings(s => ({ ...s, askReviewAfterDownload: v }))} />
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Contacts */}
-                        {settingsTab === "Contacts" && (
-                            <div className="space-y-4">
-                                <div className="rounded-xl border border-muted divide-y divide-muted/50 overflow-hidden">
-                                    <div className="flex items-center justify-between px-4 py-4">
-                                        <p className="text-sm font-medium">Show Share button</p>
-                                        <Toggle checked={settings.showShareButton} onChange={v => setSettings(s => ({ ...s, showShareButton: v }))} />
-                                    </div>
-                                    <div className="flex items-center justify-between px-4 py-4">
-                                        <p className="text-sm font-medium">Show Business card widget</p>
-                                        <Toggle checked={settings.showBusinessCard} onChange={v => setSettings(s => ({ ...s, showBusinessCard: v }))} />
-                                    </div>
-                                    <div className="flex items-center justify-between px-4 py-4">
-                                        <p className="text-sm font-medium">Show your name and website on cover</p>
-                                        <Toggle checked={settings.showNameOnCover} onChange={v => setSettings(s => ({ ...s, showNameOnCover: v }))} />
-                                    </div>
-                                </div>
-                                <div className="text-center py-8 opacity-50">
-                                    <p className="text-xs text-muted-foreground italic">Business info is pulled from your profile settings.</p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Privacy */}
-                        {settingsTab === "Privacy" && (
-                            <div className="space-y-4">
-                                <div className="rounded-xl border border-muted p-4">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <p className="text-sm font-medium">Protect with a password</p>
-                                        <Toggle checked={settings.protectWithPassword} onChange={v => setSettings(s => ({ ...s, protectWithPassword: v }))} />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-semibold mb-1.5">Password</label>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                value={settings.password}
-                                                onChange={e => setSettings(s => ({ ...s, password: e.target.value }))}
-                                                placeholder="e.g. 54321"
-                                                className="w-full px-4 py-2.5 rounded-xl border border-muted bg-background focus:outline-none focus:ring-2 focus:ring-foreground text-sm font-mono pr-10"
-                                            />
-                                        </div>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-4">
-                                        Visitors need a password to view the gallery. With password access, hidden folders and saved Favorites become available.
-                                    </p>
-                                </div>
-
-                                <div className="rounded-xl border border-muted p-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <p className="text-sm font-medium">Allow guest access</p>
-                                        <Toggle checked={settings.allowGuestAccess} onChange={v => setSettings(s => ({ ...s, allowGuestAccess: v }))} />
-                                    </div>
-                                    <p className="text-xs text-muted-foreground mt-2">
-                                        Guests can view the gallery without a password, but they will not see hidden folders or saved Favorites.
-                                    </p>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Footer */}
-                        <div className="flex items-center justify-between mt-10 pt-6 border-t border-muted">
-                            <button onClick={handleDeleteGallery} className="flex items-center gap-2 text-sm text-rose-500 hover:text-rose-600 transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                Delete gallery
-                            </button>
-                            <div className="flex gap-3">
-                                <button onClick={() => setSection("gallery")} className="px-5 py-2.5 rounded-full border border-muted text-sm hover:bg-muted transition-colors">Cancel</button>
-                                <button onClick={handleSaveSettings} className="px-5 py-2.5 rounded-full bg-foreground text-background text-sm font-semibold hover:opacity-90 transition-opacity">
-                                    {settingsSaved ? "✓ Saved!" : "Save"}
-                                </button>
-                            </div>
+                            )}
+                            {likedPhotos.size > 0 && (
+                                <button className="px-8 py-3 rounded-full bg-white text-black text-[10px] font-black uppercase tracking-[0.3em] hover:bg-emerald-400 transition-all hover:scale-105 active:scale-95 shadow-xl">Batch Export</button>
+                            )}
                         </div>
                     </div>
-                )}
+                </nav>
 
-                {/* ── DESIGN & COVER ── */}
-                {section === "design" && (
-                    <div className="max-w-4xl slide-up">
-                        <div className="mb-10">
-                            <h2 className="text-2xl font-black tracking-tight">Aesthetic Curation</h2>
-                            <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest mt-1">Sculpt the visual persona of this sanctuary</p>
-                        </div>
-
-                        <div className="relative w-full h-[400px] rounded-[3rem] overflow-hidden mb-12 shadow-2xl flex items-end p-12 transition-all duration-700 bg-black/40 border border-white/5" style={{ background: `linear-gradient(135deg, ${coverColor} 0%, ${coverAccent}33 100%)` }}>
-                            {images[0]?.url && (
-                                <img src={images[0].url} alt="cover" className="absolute inset-0 w-full h-full object-cover opacity-20 hover:opacity-30 transition-opacity duration-700" />
+                {/* ── VIEWPORT ── */}
+                <main className="max-w-7xl mx-auto px-10 py-20 min-h-[50vh]">
+                    
+                    {/* Collection View */}
+                    {section === "gallery" && (
+                        <div className="animate-fade-in">
+                            {isAdmin && (
+                                <div 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="group relative h-48 mb-20 rounded-[3rem] border-2 border-dashed border-white/10 bg-white/[0.01] hover:bg-blue-600/5 hover:border-blue-500/30 transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden"
+                                >
+                                    <div className="relative z-10 flex flex-col items-center gap-4 transition-transform duration-700 group-hover:-translate-y-2">
+                                        <div className="w-14 h-14 rounded-3xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-xl">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-[11px] font-black uppercase tracking-[0.4em] text-white/30 group-hover:text-white transition-all">Expand Collection</p>
+                                            <p className="text-[9px] text-white/10 mt-2 uppercase font-bold tracking-widest">Supports high-res Visuals & Reels</p>
+                                        </div>
+                                    </div>
+                                    <input ref={fileInputRef} type="file" multiple className="hidden" onChange={e => e.target.files && setUploadFiles(Array.from(e.target.files))} />
+                                </div>
                             )}
-                            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
-                            <div className="relative z-10 slide-up">
-                                <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em] mb-4">EXCLUSIVE SECURE DRIVE</p>
-                                <h3 className="text-white text-6xl font-black tracking-tighter mb-4 text-gradient">{clientName}</h3>
-                                <div className="flex items-center gap-4">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                                    <p className="text-white/40 text-xs font-bold uppercase tracking-widest">{images.length + videos.length} ASSETS STAGED</p>
+
+                            {uploadFiles.length > 0 && (
+                                <div className="fixed bottom-10 left-10 right-10 z-[100] p-6 rounded-[2.5rem] bg-white text-black flex items-center justify-between shadow-[0_40px_100px_rgba(0,0,0,0.8)] animate-fade-in">
+                                    <div className="flex items-center gap-6">
+                                        <div className="w-12 h-12 bg-black rounded-2xl flex items-center justify-center text-white text-sm font-black">{uploadFiles.length}</div>
+                                        <div>
+                                            <p className="text-xs font-black uppercase tracking-widest leading-none">Preparing Assets</p>
+                                            <p className="text-[10px] font-medium opacity-50 mt-1.5">Your files are being optimized for delivery.</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <button onClick={() => setUploadFiles([])} className="px-8 py-3 text-[10px] font-black uppercase tracking-widest opacity-30 hover:opacity-100 transition-opacity">Abort</button>
+                                        <button onClick={handleUpload} disabled={isUploading} className="px-10 py-4 rounded-2xl bg-black text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all">{isUploading ? "Optimizing..." : "Initialize Upload"}</button>
+                                    </div>
                                 </div>
+                            )}
+
+                            <PhotoGrid photos={mediaTab === "images" ? images : videos} enableLikes={settings.allowSelection} onLike={handleLike} likedPhotos={likedPhotos} />
+                        </div>
+                    )}
+
+                    {/* Favorites View */}
+                    {section === "favorites" && (
+                        <div className="animate-fade-in">
+                            <div className="flex flex-col items-center justify-center py-40 border border-white/5 rounded-[4rem] bg-white/[0.01]">
+                                {likedPhotos.size === 0 ? (
+                                    <>
+                                        <div className="w-32 h-32 rounded-[3.5rem] bg-white/5 flex items-center justify-center mb-10 text-6xl opacity-20 rotate-[15deg]">♥</div>
+                                        <h2 className="text-3xl font-black tracking-tighter mb-4">Your selection is empty</h2>
+                                        <p className="text-white/30 text-sm max-w-xs text-center leading-relaxed mb-12">Capture your favorite moments by hearting them in the collection.</p>
+                                        <button onClick={() => setSection("gallery")} className="px-12 py-5 rounded-full border border-white/10 hover:border-white transition-all text-[11px] font-black uppercase tracking-[0.4em]">Browse Visuals</button>
+                                    </>
+                                ) : (
+                                    <div className="w-full px-10">
+                                        <div className="flex items-center justify-between mb-16 px-4">
+                                            <div>
+                                                <h2 className="text-4xl font-black tracking-tighter leading-none mb-3">Saved Moments</h2>
+                                                <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.5em]">{likedPhotos.size} items preserved</p>
+                                            </div>
+                                            <button className="px-10 py-5 rounded-full bg-white text-black text-[10px] font-black uppercase tracking-[0.4em] shadow-2xl hover:bg-emerald-400 transition-all">Bulk Download</button>
+                                        </div>
+                                        <PhotoGrid photos={images.filter(img => likedPhotos.has(img.id))} enableLikes onLike={handleLike} likedPhotos={likedPhotos} />
+                                    </div>
+                                )}
                             </div>
                         </div>
+                    )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-12">
-                            <div className="glass-dark p-8 rounded-[2rem] border border-white/5">
-                                <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-6 ml-1">Universal Hue</label>
-                                <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all">
-                                    <div className="flex items-center gap-4">
-                                        <input type="color" value={coverColor} onChange={e => setCoverColor(e.target.value)} className="w-10 h-10 rounded-xl cursor-pointer border-0 bg-transparent" />
-                                        <span className="text-xs font-mono font-bold text-white/40 tracking-widest uppercase">{coverColor}</span>
-                                    </div>
-                                    <div className="w-2 h-2 rounded-full" style={{ background: coverColor }}></div>
-                                </div>
-                            </div>
-                            <div className="glass-dark p-8 rounded-[2rem] border border-white/5">
-                                <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-6 ml-1">Accent Vibration</label>
-                                <div className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 group hover:border-white/20 transition-all">
-                                    <div className="flex items-center gap-4">
-                                        <input type="color" value={coverAccent} onChange={e => setCoverAccent(e.target.value)} className="w-10 h-10 rounded-xl cursor-pointer border-0 bg-transparent" />
-                                        <span className="text-xs font-mono font-bold text-white/40 tracking-widest uppercase">{coverAccent}</span>
-                                    </div>
-                                    <div className="w-2 h-2 rounded-full accent-glow" style={{ background: coverAccent }}></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-[10px] font-bold text-white/30 uppercase tracking-widest mb-6 ml-1">Cover Asset Selection</label>
-                            <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-8 gap-4 mb-12">
-                                {images.slice(0, 16).map((img, idx) => (
-                                    <button key={idx} className="aspect-square rounded-2xl overflow-hidden border-2 border-white/5 hover:border-blue-500 hover:scale-105 transition-all shadow-xl group">
-                                        <img src={img.url} alt="" className="w-full h-full object-cover group-hover:opacity-60 transition-opacity" />
+                    {/* Management View (Admin only) */}
+                    {section === "settings" && isAdmin && (
+                        <div className="max-w-4xl mx-auto animate-fade-in grid grid-cols-1 md:grid-cols-[280px_1fr] gap-20">
+                            <aside className="space-y-2">
+                                <p className="text-[10px] font-black uppercase tracking-[0.5em] text-white/20 mb-8">System settings</p>
+                                {(["Main", "Favorites", "Products", "Reviews", "Contacts", "Privacy"] as SettingsTab[]).map((tab: SettingsTab) => (
+                                    <button 
+                                        key={tab} 
+                                        onClick={() => setSettingsTab(tab)}
+                                        className={`w-full text-left px-8 py-5 rounded-[1.5rem] transition-all duration-300 ${settingsTab === tab ? "bg-white text-black font-black" : "text-white/30 hover:bg-white/5 hover:text-white font-bold"}`}
+                                    >
+                                        <span className="text-[11px] uppercase tracking-widest">{tab}</span>
                                     </button>
                                 ))}
-                                {images.length === 0 && <p className="text-[11px] font-bold text-white/20 col-span-8 py-10 text-center italic border-2 border-dashed border-white/5 rounded-3xl">No visual assets available for selection.</p>}
+                            </aside>
+                            
+                            <div className="space-y-12">
+                                {settingsTab === "Main" && (
+                                    <div className="space-y-10 animate-fade-in">
+                                        <div className="space-y-3">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-white/20 ml-2">Display Name</label>
+                                            <input type="text" value={settings.galleryName} onChange={e => setSettings(s => ({ ...s, galleryName: e.target.value }))} className="w-full bg-[#0a0a0a] border border-white/5 rounded-3xl px-8 py-6 text-sm font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-white/20 outline-none transition-all" />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-8">
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black uppercase tracking-widest text-white/20 ml-2">Capture Date</label>
+                                                <input type="date" value={settings.shootDate} onChange={e => setSettings(s => ({ ...s, shootDate: e.target.value }))} className="w-full bg-[#0a0a0a] border border-white/5 rounded-3xl px-8 py-6 text-sm font-bold [color-scheme:dark]" />
+                                            </div>
+                                            <div className="space-y-3">
+                                                <label className="text-[10px] font-black uppercase tracking-widest text-white/20 ml-2">Retention until</label>
+                                                <input type="date" value={settings.storeUntil} onChange={e => setSettings(s => ({ ...s, storeUntil: e.target.value }))} className="w-full bg-[#0a0a0a] border border-white/5 rounded-3xl px-8 py-6 text-sm font-bold [color-scheme:dark]" />
+                                            </div>
+                                        </div>
+                                        <div className="p-10 rounded-[3.5rem] bg-white/[0.02] border border-white/5 space-y-6">
+                                            {[
+                                                { label: "High-Res Downloads", sub: "Enable original file exports", key: "allowDownloads" as keyof GallerySettings },
+                                                { label: "IP Watermarking", sub: "Inject protection on previews", key: "addWatermark" as keyof GallerySettings },
+                                            ].map(item => (
+                                                <div key={item.key} className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-sm font-black tracking-tight">{item.label}</p>
+                                                        <p className="text-[10px] text-white/20 font-bold uppercase tracking-widest mt-1.5">{item.sub}</p>
+                                                    </div>
+                                                    <Toggle checked={settings[item.key] as boolean} onChange={v => setSettings(s => ({ ...s, [item.key]: v }))} />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                {settingsTab !== "Main" && (
+                                    <div className="py-20 text-center animate-fade-in border border-white/5 rounded-[4rem] bg-white/[0.01]">
+                                        <div className="w-20 h-20 rounded-[2rem] bg-white/5 flex items-center justify-center mx-auto mb-8 text-4xl opacity-10 rotate-12">⚙</div>
+                                        <p className="text-white/20 text-[10px] font-black uppercase tracking-[0.5em]">{settingsTab} Module Active</p>
+                                        <p className="text-white/10 text-[9px] font-bold uppercase tracking-widest mt-3">Advanced configuration pending initialization</p>
+                                    </div>
+                                )}
+                                <div className="pt-12 border-t border-white/5 flex gap-4">
+                                    <button onClick={handleSaveSettings} className="flex-1 py-6 rounded-[2rem] bg-white text-black text-[11px] font-black uppercase tracking-[0.4em] shadow-2xl hover:bg-emerald-400 transition-all">Synchronize settings</button>
+                                </div>
                             </div>
                         </div>
-                        <button onClick={handleSaveSettings} className="px-10 py-4 rounded-2xl bg-blue-600 text-white font-black text-xs uppercase tracking-[0.2em] hover:bg-blue-500 transition-all accent-glow active:scale-95 shadow-2xl">
-                            COMMIT DESIGN CHANGES
-                        </button>
-                    </div>
-                )}
+                    )}
+
+                    {/* Atmosphere View (Admin only) */}
+                    {section === "design" && isAdmin && (
+                        <div className="max-w-4xl mx-auto animate-fade-in space-y-20">
+                            <div>
+                                <h2 className="text-4xl font-black tracking-tighter mb-3 leading-none">Visual Atmosphere</h2>
+                                <p className="text-white/30 text-[10px] font-black uppercase tracking-[0.5em]">Tailor the brand experience</p>
+                            </div>
+                            
+                            <div className="relative h-96 rounded-[4rem] overflow-hidden border border-white/10 group">
+                                {coverImg && <img src={coverImg} alt="" className="absolute inset-0 w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-110" />}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" style={{ backgroundColor: `${coverColor}88` }}></div>
+                                <div className="absolute bottom-12 left-12 right-12 z-10">
+                                    <span className="text-emerald-400 text-[10px] font-black uppercase tracking-[0.5em] mb-4 block">Live Atmosphere Preview</span>
+                                    <h3 className="text-6xl font-black tracking-tighter text-white uppercase">{clientName}</h3>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-10">
+                                {[
+                                    { label: "Primary Palette", state: coverColor, set: setCoverColor },
+                                    { label: "Accent Highlight", state: coverAccent, set: setCoverAccent }
+                                ].map(item => (
+                                    <div key={item.label} className="p-10 rounded-[3.5rem] bg-white/[0.02] border border-white/5">
+                                        <label className="block text-[10px] font-black uppercase tracking-[0.5em] text-white/20 mb-8">{item.label}</label>
+                                        <div className="flex items-center gap-6 p-4 rounded-3xl bg-black/40 border border-white/5">
+                                            <input type="color" value={item.state} onChange={e => item.set(e.target.value)} className="w-16 h-16 rounded-2xl cursor-pointer bg-transparent border-0" />
+                                            <span className="text-sm font-mono font-black text-white/40 uppercase tracking-widest">{item.state}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <button onClick={handleSaveSettings} className="w-full py-8 rounded-[3rem] bg-white text-black text-[11px] font-black uppercase tracking-[0.4em] shadow-2xl hover:bg-emerald-400 transition-all">Propagate Visual design</button>
+                        </div>
+                    )}
+                </main>
             </div>
 
             <style>{`
-                .scrollbar-none { scrollbar-width: none; }
-                .scrollbar-none::-webkit-scrollbar { display: none; }
-                .inverted-scheme::-webkit-calendar-picker-indicator {
-                    filter: invert(1);
-                    opacity: 0.3;
-                    cursor: pointer;
-                }
-                .inverted-scheme::-webkit-calendar-picker-indicator:hover {
-                    opacity: 1;
+                .animate-fade-in { animation: fadeIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+                .delay-100 { animation-delay: 0.1s; }
+                .delay-200 { animation-delay: 0.2s; }
+                .delay-300 { animation-delay: 0.3s; }
+                @keyframes fadeIn { 
+                    from { opacity: 0; transform: translateY(30px); filter: blur(10px); } 
+                    to { opacity: 1; transform: translateY(0); filter: blur(0); } 
                 }
             `}</style>
         </div>

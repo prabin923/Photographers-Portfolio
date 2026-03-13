@@ -12,13 +12,24 @@ const FEATURES = [
   { icon: "⊞", title: "Instant Delivery", desc: "Share unique gallery links that clients can access from any device, anywhere in the world." },
 ];
 
-const SHOWCASE = [
-  "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=800&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=800&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1525786053596-654cbfe4e3c4?q=80&w=800&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1472396961693-142e6e269027?q=80&w=800&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=800&auto=format&fit=crop",
-  "https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?q=80&w=800&auto=format&fit=crop",
+const SHOWCASE_ROW1 = [
+  { url: "https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=900&auto=format&fit=crop", label: "Golden Hour Wedding", category: "Wedding" },
+  { url: "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?q=80&w=900&auto=format&fit=crop", label: "Ceremony in Bloom", category: "Wedding" },
+  { url: "https://images.unsplash.com/photo-1537151608828-ea2b11777ee8?q=80&w=900&auto=format&fit=crop", label: "Warm Embrace", category: "Portrait" },
+  { url: "https://images.unsplash.com/photo-1469334031218-e382a71b716b?q=80&w=900&auto=format&fit=crop", label: "Editorial Look", category: "Fashion" },
+  { url: "https://images.unsplash.com/photo-1594552072238-b8a33785b6cd?q=80&w=900&auto=format&fit=crop", label: "Bridal Glow", category: "Wedding" },
+  { url: "https://images.unsplash.com/photo-1583939003579-730e3918a45a?q=80&w=900&auto=format&fit=crop", label: "Timeless Vows", category: "Wedding" },
+  { url: "https://images.unsplash.com/photo-1525786053596-654cbfe4e3c4?q=80&w=900&auto=format&fit=crop", label: "Sunlit Portraits", category: "Portrait" },
+];
+
+const SHOWCASE_ROW2 = [
+  { url: "https://images.unsplash.com/photo-1472396961693-142e6e269027?q=80&w=900&auto=format&fit=crop", label: "Into the Wild", category: "Nature" },
+  { url: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?q=80&w=900&auto=format&fit=crop", label: "Urban Pulse", category: "Street" },
+  { url: "https://images.unsplash.com/photo-1520854221256-17451cc331bf?q=80&w=900&auto=format&fit=crop", label: "Serenity Now", category: "Nature" },
+  { url: "https://images.unsplash.com/photo-1465495976277-4387d4b0b4c6?q=80&w=900&auto=format&fit=crop", label: "Just Married", category: "Wedding" },
+  { url: "https://images.unsplash.com/photo-1591604466107-ec97de577aff?q=80&w=900&auto=format&fit=crop", label: "First Dance", category: "Wedding" },
+  { url: "https://images.unsplash.com/photo-1500917293891-ef795e70e1f6?q=80&w=900&auto=format&fit=crop", label: "Quiet Moment", category: "Portrait" },
+  { url: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=900&auto=format&fit=crop", label: "City Love", category: "Street" },
 ];
 
 export default function Home() {
@@ -105,28 +116,80 @@ export default function Home() {
       </section>
 
       {/* ─── GALLERY MOSAIC SHOWCASE ─── */}
-      <section id="gallery" className="py-24 px-8 overflow-hidden">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400 mb-4">Work delivered with LensFolio</p>
-            <h2 className="text-4xl md:text-5xl font-black tracking-tight">
-              Galleries your clients<br />
-              <span className="text-white/25 italic font-light">will fall in love with</span>
-            </h2>
+      <section id="gallery" className="py-32 overflow-hidden relative">
+        {/* Background glow */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-[60vw] h-[40vw] rounded-full bg-blue-600/4 blur-[120px]" />
+        </div>
+
+        {/* Heading */}
+        <div className="text-center mb-20 px-8 relative z-10">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/8 text-[11px] font-semibold text-blue-400 mb-6 tracking-widest uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+            Work delivered with LensFolio
           </div>
-          {/* Scrolling strip */}
-          <div className="relative">
-            <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-[#0a0a0a] to-transparent z-10"></div>
-            <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-[#0a0a0a] to-transparent z-10"></div>
-            <div className="flex gap-4 overflow-hidden">
-              <div className="flex gap-4 animate-[marquee_30s_linear_infinite]" style={{ minWidth: "max-content" }}>
-                {[...SHOWCASE, ...SHOWCASE].map((url, i) => (
-                  <div key={i} className="flex-shrink-0 w-64 h-44 rounded-2xl overflow-hidden border border-white/5">
-                    <img src={url} alt="" className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+          <h2 className="text-4xl md:text-6xl font-black tracking-tight leading-tight">
+            Galleries your clients<br />
+            <span className="text-white/20 italic font-light">will fall in love with</span>
+          </h2>
+          <p className="text-white/30 mt-5 text-base font-medium max-w-xl mx-auto">
+            Cinematic, private, and breathtaking — delivered in seconds.
+          </p>
+        </div>
+
+        {/* Row 1 — left to right */}
+        <div className="relative mb-4">
+          <div className="absolute left-0 top-0 bottom-0 w-40 bg-gradient-to-r from-[#0a0a0a] to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-40 bg-gradient-to-l from-[#0a0a0a] to-transparent z-10 pointer-events-none" />
+          <div className="flex gap-5 overflow-hidden">
+            <div className="flex gap-5 animate-[marquee_40s_linear_infinite]" style={{ minWidth: "max-content" }}>
+              {[...SHOWCASE_ROW1, ...SHOWCASE_ROW1].map((item, i) => (
+                <div key={i} className="flex-shrink-0 w-72 h-56 rounded-3xl overflow-hidden border border-white/5 relative group cursor-pointer shadow-2xl">
+                  <img src={item.url} alt={item.label} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-500" />
+                  <div className="absolute bottom-0 left-0 right-0 p-5 translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
+                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40 block mb-1">{item.category}</span>
+                    <p className="text-white font-bold text-sm">{item.label}</p>
                   </div>
-                ))}
-              </div>
+                </div>
+              ))}
             </div>
+          </div>
+        </div>
+
+        {/* Row 2 — right to left */}
+        <div className="relative">
+          <div className="absolute left-0 top-0 bottom-0 w-40 bg-gradient-to-r from-[#0a0a0a] to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-40 bg-gradient-to-l from-[#0a0a0a] to-transparent z-10 pointer-events-none" />
+          <div className="flex gap-5 overflow-hidden">
+            <div className="flex gap-5 animate-[marqueeReverse_35s_linear_infinite]" style={{ minWidth: "max-content" }}>
+              {[...SHOWCASE_ROW2, ...SHOWCASE_ROW2].map((item, i) => (
+                <div key={i} className="flex-shrink-0 w-72 h-56 rounded-3xl overflow-hidden border border-white/5 relative group cursor-pointer shadow-2xl">
+                  <img src={item.url} alt={item.label} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-60 group-hover:opacity-90 transition-opacity duration-500" />
+                  <div className="absolute bottom-0 left-0 right-0 p-5 translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
+                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40 block mb-1">{item.category}</span>
+                    <p className="text-white font-bold text-sm">{item.label}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Stat bar */}
+        <div className="mt-20 px-8 max-w-3xl mx-auto">
+          <div className="grid grid-cols-3 gap-px bg-white/5 rounded-3xl overflow-hidden border border-white/5">
+            {[
+              { value: "10,000+", label: "Galleries Delivered" },
+              { value: "99.9%", label: "Client Satisfaction" },
+              { value: "< 2s", label: "Load Time" },
+            ].map((s, i) => (
+              <div key={i} className="bg-[#0a0a0a] py-8 text-center hover:bg-white/[0.02] transition-colors">
+                <p className="text-2xl font-black mb-1">{s.value}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/25">{s.label}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
