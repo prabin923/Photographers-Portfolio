@@ -309,14 +309,14 @@ export default function AdminDashboard() {
                                 (planInfo?.storage.percentUsed || 0) > 70 ? 'bg-amber-500' : 'bg-blue-500'
                                 }`} style={{ width: `${Math.min(planInfo?.storage.percentUsed || 0, 100)}%` }}></div>
                         </div>
-                        <p className="text-[10px] text-white/30">{planInfo?.storage.usedGB || 0} GB of {planInfo?.storage.limitGB || 5} GB</p>
+                        <p className="text-[10px] text-white/30">{planInfo?.storage.usedGB || 0} GB of {planInfo?.storage.limitGB || 120} GB</p>
                     </div>
 
                     {/* Gallery count */}
                     <div className="px-1 flex items-center justify-between">
                         <p className="text-[9px] text-white/20">Galleries</p>
                         <p className="text-[9px] font-bold text-white/30">
-                            {planInfo?.galleries.count || 0} / {planInfo?.galleries.limit === -1 ? '∞' : (planInfo?.galleries.limit || 3)}
+                            {planInfo?.galleries.count || 0} / {planInfo?.galleries.limit === -1 ? '∞' : (planInfo?.galleries.limit || '∞')}
                         </p>
                     </div>
                 </div>
@@ -466,7 +466,7 @@ export default function AdminDashboard() {
                                 { label: "Galleries", value: drives.length, color: "blue", icon: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" },
                                 { label: "Media Assets", value: drives.reduce((a, d) => a + (d.images?.length || 0) + (d.videos?.length || 0), 0), color: "purple", icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" },
                                 { label: "Total Views", value: drives.reduce((a, d) => a + (d.views || 0), 0), color: "emerald", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" },
-                                { label: "Storage", value: "11.3%", sub: "13.6 / 120 GB", color: "orange", icon: "M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" },
+                                { label: "Storage", value: `${planInfo?.storage.percentUsed || 0}%`, sub: `${planInfo?.storage.usedGB || 0} / ${planInfo?.storage.limitGB || 120} GB`, color: "orange", icon: "M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" },
                             ].map((stat, i) => (
                                 <div key={i} className="glass-dark rounded-2xl p-5 border border-white/5 hover:border-white/10 transition-all">
                                     <div className={`p-2.5 rounded-xl bg-${stat.color}-500/10 text-${stat.color}-400 w-fit mb-4`}>
@@ -810,9 +810,9 @@ function UpgradeModal({ isOpen, onClose, currentPlanId, onUpgrade, isUpgrading }
     if (!isOpen) return null;
 
     const plans = [
-        { id: 'free', name: 'Free', price: '$0', storage: '5 GB', galleries: '3 Galleries', color: 'gray' },
-        { id: 'pro', name: 'Pro', price: '$12', storage: '120 GB', galleries: 'Unlimited', color: 'blue' },
-        { id: 'business', name: 'Business', price: '$29', storage: '500 GB', galleries: 'Unlimited', color: 'amber' },
+        { id: 'free', name: 'Starter', price: '$0', storage: '120 GB', galleries: 'Unlimited', color: 'gray' },
+        { id: 'pro', name: 'Pro', price: '$12', storage: '500 GB', galleries: 'Unlimited', color: 'blue' },
+        { id: 'business', name: 'Business', price: '$29', storage: '2 TB', galleries: 'Unlimited', color: 'amber' },
     ];
 
     return (

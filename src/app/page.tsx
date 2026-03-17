@@ -106,7 +106,7 @@ export default function Home() {
               See example portfolio →
             </Link>
           </div>
-          <p className="text-xs text-white/20 font-medium">No credit card required &nbsp;·&nbsp; Free forever plan available</p>
+          <p className="text-xs text-white/20 font-medium">No credit card required &nbsp;·&nbsp; 120 GB Starter plan included</p>
         </div>
 
         {/* Scroll indicator */}
@@ -250,10 +250,10 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {[
               {
-                name: "Free",
+                name: "Starter",
                 price: "$0",
                 period: "forever",
-                features: ["1 portfolio website", "Up to 3 client galleries", "5 GB storage", "Basic themes"],
+                features: ["1 portfolio website", "Unlimited client galleries", "120 GB storage", "Basic themes"],
                 cta: "Start free",
                 highlight: false,
               },
@@ -262,7 +262,7 @@ export default function Home() {
                 price: "$12",
                 period: "per month",
                 badge: "Most popular",
-                features: ["Unlimited portfolio site", "Unlimited galleries", "120 GB storage", "All premium themes", "Custom accent colors", "Priority support"],
+                features: ["Unlimited portfolio site", "Unlimited galleries", "500 GB storage", "All premium themes", "Custom accent colors", "Priority support"],
                 cta: "Start free trial",
                 highlight: true,
               },
@@ -270,7 +270,7 @@ export default function Home() {
                 name: "Business",
                 price: "$29",
                 period: "per month",
-                features: ["Everything in Pro", "500 GB storage", "Custom domain support", "White-label experience", "4K video hosting", "VIP support"],
+                features: ["Everything in Pro", "2 TB storage", "Custom domain support", "White-label experience", "4K video hosting", "VIP support"],
                 cta: "Get Business",
                 highlight: false,
               },
