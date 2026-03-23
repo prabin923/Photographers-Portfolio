@@ -55,7 +55,7 @@ interface SavedAccount { id: string; name: string; email: string; token: string;
 export default function AdminDashboard() {
     const router = useRouter();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [sidebarTab, setSidebarTab] = useState<"dashboard" | "website">("dashboard");
+    const [sidebarTab, setSidebarTab] = useState<"dashboard" | "website" | "ai-detector">("dashboard");
     const [drives, setDrives] = useState<Drive[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
@@ -63,6 +63,12 @@ export default function AdminDashboard() {
     const [uploadFiles, setUploadFiles] = useState<File[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // AI Detector State
+    const [aiFileBase64, setAiFileBase64] = useState<string | null>(null);
+    const [aiFileObj, setAiFileObj] = useState<File | null>(null);
+    const [isCheckingAi, setIsCheckingAi] = useState(false);
+    const [aiResult, setAiResult] = useState<string | null>(null);
 
     // Website Builder
     const [site, setSite] = useState<SiteSettings>(defaultSite);
@@ -273,8 +279,9 @@ export default function AdminDashboard() {
                     {[
                         { id: "dashboard", label: "Dashboard", icon: <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg> },
                         { id: "website", label: "Website Builder", icon: <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" /></svg> },
+                        { id: "ai-detector", label: "AI Image Detector", icon: <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg> },
                     ].map(item => (
-                        <button key={item.id} onClick={() => setSidebarTab(item.id as "dashboard" | "website")}
+                        <button key={item.id} onClick={() => setSidebarTab(item.id as any)}
                             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${sidebarTab === item.id ? "bg-blue-600/15 text-blue-400 border border-blue-500/20" : "text-white/40 hover:text-white hover:bg-white/5"}`}>
                             {item.icon} {item.label}
                             {item.id === "website" && isPublished && (
@@ -331,7 +338,7 @@ export default function AdminDashboard() {
                             <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3.5 top-2.5 w-4 h-4 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                             <input type="text" placeholder="Search galleries..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-white/5 border border-white/5 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/40 transition-all placeholder:text-white/20" />
                         </div>
-                    ) : (
+                    ) : sidebarTab === "website" ? (
                         <div className="flex items-center gap-4">
                             <div>
                                 <h1 className="text-sm font-black tracking-tight">Website Builder</h1>
@@ -340,6 +347,13 @@ export default function AdminDashboard() {
                             <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${isPublished ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-white/5 text-white/30 border border-white/5"}`}>
                                 <span className={`w-1 h-1 rounded-full ${isPublished ? "bg-emerald-400" : "bg-white/30"}`}></span>
                                 {isPublished ? "Published" : "Draft"}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-4">
+                            <div>
+                                <h1 className="text-sm font-black tracking-tight">AI Image Detector</h1>
+                                <p className="text-[10px] text-white/30">Powered by Gemini</p>
                             </div>
                         </div>
                     )}
@@ -790,6 +804,135 @@ export default function AdminDashboard() {
                                     className="w-full h-full border-0"
                                     style={{ colorScheme: "normal" }}
                                 />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ═══════════════════════════════════════════════ */}
+                {/* AI DETECTOR VIEW */}
+                {/* ═══════════════════════════════════════════════ */}
+                {sidebarTab === "ai-detector" && (
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+                        <div className="max-w-4xl mx-auto">
+                            <div className="mb-8">
+                                <h2 className="text-2xl font-black tracking-tight flex items-center gap-3">
+                                    <span className="text-blue-400">✦</span> AI Image Detector
+                                </h2>
+                                <p className="text-white/30 text-sm mt-1">Upload an image to securely detect whether it contains signs of being AI generated, using our deep scanning analysis model.</p>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* Upload Box */}
+                                <div className="glass-dark border border-white/5 rounded-3xl p-6">
+                                    <div 
+                                        className="border-2 border-dashed border-white/10 rounded-2xl p-10 flex flex-col items-center justify-center cursor-pointer hover:border-blue-500/40 hover:bg-blue-500/5 transition-all group min-h-[300px]"
+                                        onClick={() => document.getElementById('ai-file-upload')?.click()}
+                                    >
+                                        <input 
+                                            id="ai-file-upload" 
+                                            type="file" 
+                                            accept="image/*" 
+                                            className="hidden" 
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                if (!file) return;
+                                                const reader = new FileReader();
+                                                reader.onload = (ev) => {
+                                                    const result = ev.target?.result as string;
+                                                    const base64Str = result.split(',')[1];
+                                                    setAiFileBase64(base64Str);
+                                                    setAiFileObj(file);
+                                                    setAiResult(null);
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }} 
+                                        />
+                                        {aiFileObj ? (
+                                            <div className="w-full text-center">
+                                                <img src={URL.createObjectURL(aiFileObj)} alt="preview" className="max-h-48 mx-auto rounded-xl object-contain shadow-lg mb-4 cursor-pointer" />
+                                                <p className="text-sm font-bold text-white/50">{aiFileObj.name}</p>
+                                                <p className="text-[10px] text-white/30 mt-1">Click to change image</p>
+                                            </div>
+                                        ) : (
+                                            <div className="text-center">
+                                                <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-blue-500/10 transition-colors group-hover:scale-110">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-white/20 group-hover:text-blue-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                                </div>
+                                                <p className="text-base font-bold text-white/50 group-hover:text-white transition-colors">Select an image</p>
+                                                <p className="text-xs text-white/20 mt-2">JPEG, PNG, WEBP supported</p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <button 
+                                        onClick={async () => {
+                                            if (!aiFileBase64 || !aiFileObj) return;
+                                            setIsCheckingAi(true);
+                                            try {
+                                                const key = "AIzaSyAy82P4IllYzFYoSUbw59evlZa73BXNEiw";
+                                                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({
+                                                        contents: [{
+                                                            parts: [
+                                                                { text: "Analyze this image and determine if it appears to be AI generated. Output a clear conclusion at the beginning (ex: 'Likely AI Generated' or 'Likely Human Photography'), then provide a confidence level, and your detailed reasoning looking closely at characteristics typical to AI generation (textures, realism, symmetry, anomalous limbs/eyes/backgrounds)." },
+                                                                { inline_data: { mime_type: aiFileObj.type || "image/jpeg", data: aiFileBase64 } }
+                                                            ]
+                                                        }]
+                                                    })
+                                                });
+                                                const data = await res.json();
+                                                const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to retrieve analysis.";
+                                                setAiResult(text);
+                                            } catch (err) {
+                                                console.error(err);
+                                                setAiResult("An error occurred during analysis.");
+                                            } finally {
+                                                setIsCheckingAi(false);
+                                            }
+                                        }}
+                                        disabled={!aiFileBase64 || isCheckingAi}
+                                        className="w-full mt-6 bg-blue-600 hover:bg-blue-500 text-white py-3.5 rounded-xl font-black uppercase tracking-widest text-xs transition-all disabled:opacity-50 disabled:hover:bg-blue-600 flex items-center justify-center gap-2"
+                                    >
+                                        {isCheckingAi ? (
+                                            <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> Scanning...</>
+                                        ) : (
+                                            <>Run AI Detection</>
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* Results Box */}
+                                <div className="glass-dark border border-white/5 rounded-3xl p-6 flex flex-col">
+                                    <h3 className="font-black text-sm uppercase tracking-widest text-white/30 mb-4 border-b border-white/5 pb-4">Detection Results</h3>
+                                    
+                                    <div className="flex-1 rounded-2xl bg-black/20 border border-white/5 p-5 overflow-y-auto custom-scrollbar">
+                                        {!aiFileObj ? (
+                                            <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                                                <p className="text-sm font-bold">No image loaded</p>
+                                                <p className="text-[10px] mt-1">Upload an image and run the detection</p>
+                                            </div>
+                                        ) : isCheckingAi ? (
+                                            <div className="h-full flex flex-col items-center justify-center space-y-4">
+                                                <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center">
+                                                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                                                </div>
+                                                <p className="text-xs font-bold text-white/50 tracking-widest uppercase animate-pulse">Deep Scanning Image...</p>
+                                            </div>
+                                        ) : aiResult ? (
+                                            <div className="text-white/70 text-sm leading-relaxed whitespace-pre-wrap font-medium">
+                                                {aiResult}
+                                            </div>
+                                        ) : (
+                                            <div className="h-full flex flex-col items-center justify-center text-center opacity-40">
+                                                <p className="text-sm font-bold">Ready to analyze</p>
+                                                <p className="text-[10px] mt-1">Click the button to scan</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
